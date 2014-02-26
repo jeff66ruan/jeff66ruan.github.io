@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: 
+
+Sitemap: http://jeff66ruan.github.io/sitemap.xml 
