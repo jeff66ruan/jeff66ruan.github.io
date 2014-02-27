@@ -1,24 +1,97 @@
-<?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
 
-  <title><![CDATA[For Fun and Logging]]></title>
-  <link href="http://jeff66ruan.github.io/atom.xml" rel="self"/>
-  <link href="http://jeff66ruan.github.io/"/>
-  <updated>2014-02-27T13:20:08+08:00</updated>
-  <id>http://jeff66ruan.github.io/</id>
-  <author>
-    <name><![CDATA[Jeff Ruan]]></name>
-    
-  </author>
-  <generator uri="http://octopress.org/">Octopress</generator>
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>双向链表在Linux Kernel中的实现 - For Fun and Logging</title>
+  <meta name="author" content="Jeff Ruan">
 
   
-  <entry>
-    <title type="html"><![CDATA[双向链表在Linux Kernel中的实现]]></title>
-    <link href="http://jeff66ruan.github.io/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/"/>
-    <updated>2014-02-27T05:41:58+08:00</updated>
-    <id>http://jeff66ruan.github.io/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel</id>
-    <content type="html"><![CDATA[<p>双向链表是一个简单的数据结构,使用非常广泛，应该人人知道，会用，打开编辑器马上可以写一个。但是Linux的双向链表实现非常巧妙，它使用了一个小小的编程技巧，使得开发人员定义自己的数据结构时添加一个struct list_head字段（list_head是Linux Kernel定义的双向链表的数据结构），就可以使自己的数据结构具备双向链表功能，采用Linux Kernel提供的操作函数，使得使用双向链表非常简单。如果我们在v3.9-rc8中grep list_head，竟然有多达11400多条匹配，可见双向链表在Linux kernel中的江湖地位，实际上，我们在读Linux源码时，到处可以见到以list_head组织起来的数据结构。</p>
+  <meta name="description" content="双向链表是一个简单的数据结构,使用非常广泛，应该人人知道，会用，打开编辑器马上可以写一个。但是Linux的双向链表实现非常巧妙，它使用了一个小小的编程技巧，使得开发人员定义自己的数据结构时添加一个struct list_head字段（list_head是Linux &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://jeff66ruan.github.io/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="For Fun and Logging" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">For Fun and Logging</a></h1>
+  
+    <h2>Linux & Code</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:jeff66ruan.github.io" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">双向链表在Linux Kernel中的实现</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-02-27T05:41:58+08:00" pubdate data-updated="true">Feb 27<span>th</span>, 2014</time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>双向链表是一个简单的数据结构,使用非常广泛，应该人人知道，会用，打开编辑器马上可以写一个。但是Linux的双向链表实现非常巧妙，它使用了一个小小的编程技巧，使得开发人员定义自己的数据结构时添加一个struct list_head字段（list_head是Linux Kernel定义的双向链表的数据结构），就可以使自己的数据结构具备双向链表功能，采用Linux Kernel提供的操作函数，使得使用双向链表非常简单。如果我们在v3.9-rc8中grep list_head，竟然有多达11400多条匹配，可见双向链表在Linux kernel中的江湖地位，实际上，我们在读Linux源码时，到处可以见到以list_head组织起来的数据结构。</p>
 
 <p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/lines-of-list-head.png"></p>
 
@@ -196,7 +269,108 @@ id=2, name=struct2</p></blockquote>
 <li>通过list_entry及其他_entry结尾的函数得到原数据结构的指针，list_entry的实现采用了一个小技巧，是链表方便易用的原因</li>
 </ol>
 
-]]></content>
-  </entry>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
   
-</feed>
+
+<span class="byline author vcard">Posted by <span class="fn">Jeff Ruan</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-02-27T05:41:58+08:00" pubdate data-updated="true">Feb 27<span>th</span>, 2014</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/blog/'>blog</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="//twitter.com/share" class="twitter-share-button" data-url="http://jeff66ruan.github.io/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/" data-via="" data-counturl="http://jeff66ruan.github.io/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/">双向链表在Linux Kernel中的实现</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - Jeff Ruan -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = '//platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>
