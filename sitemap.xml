@@ -4,18 +4,22 @@
         <loc>
             http://jeff66ruan.github.io/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/
         </loc>
-        <lastmod>2014-02-27T13:19:44+08:00</lastmod>
+        <lastmod>2014-03-10T07:32:45+08:00</lastmod>
+    </url>
+    <url>
+        <loc>http://jeff66ruan.github.io/blog/2014/03/10/a-piece-of-code-refactoring/</loc>
+        <lastmod>2014-03-10T15:44:54+08:00</lastmod>
     </url>
     <url>
         <loc>http://jeff66ruan.github.io/blog/archives/</loc>
-        <lastmod>2014-02-27T13:19:44+08:00</lastmod>
+        <lastmod>2014-03-10T15:44:54+08:00</lastmod>
+    </url>
+    <url>
+        <loc>http://jeff66ruan.github.io/</loc>
+        <lastmod>2014-03-10T15:44:54+08:00</lastmod>
     </url>
     <url>
         <loc>http://jeff66ruan.github.io/robots.txt</loc>
         <lastmod>2014-02-27T06:16:10+08:00</lastmod>
-    </url>
-    <url>
-        <loc>http://jeff66ruan.github.io/</loc>
-        <lastmod>2014-02-27T13:19:44+08:00</lastmod>
     </url>
 </urlset>

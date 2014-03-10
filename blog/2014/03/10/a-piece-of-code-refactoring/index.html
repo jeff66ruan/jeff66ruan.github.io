@@ -5,7 +5,7 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>For Fun and Logging</title>
+  <title>一段代码的重构 - For Fun and Logging</title>
   <meta name="author" content="Jeff Ruan">
 
   
@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://jeff66ruan.github.io">
+  <link rel="canonical" href="http://jeff66ruan.github.io/blog/2014/03/10/a-piece-of-code-refactoring">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="For Fun and Logging" type="application/atom+xml">
@@ -63,15 +63,12 @@
 </nav>
   <div id="main">
     <div id="content">
-      <div class="blog-index">
+      <div>
+<article class="hentry" role="article">
   
-  
-  
-    <article>
-      
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2014/03/10/a-piece-of-code-refactoring/">一段代码的重构</a></h1>
+      <h1 class="entry-title">一段代码的重构</h1>
     
     
       <p class="meta">
@@ -94,7 +91,7 @@
   </header>
 
 
-  <div class="entry-content"><h3>为什么要对这段代码重构</h3>
+<div class="entry-content"><h3>为什么要对这段代码重构</h3>
 
 <p>上周对一段代码进行了重构，这段代码是参加一个小组的code review时读到的，这段代码并不长，只有100多行，我花了几个小时（也许两个小时），但是没有读明白这段代码是如何工作的。因为代码可读性不好，代码阅读者的时间就这样被浪费了而没有任何收获。而且代码的书写者在一段时间后也会面临同样的问题，他／她至少需要一点时间才能明白代码如何工作的。还有很重要的一点是，从长远来看，这样的代码可维护性也不高，引入新的改动会比较难或者比较容易引入新的bug。为了避免下一个代码阅读者掉入同样的一个“坑”，我决定对代码重构。</p>
 
@@ -904,22 +901,16 @@
 
 
 </div>
-  
-  
 
 
-    </article>
-  
-  
-    <article>
+  <footer>
+    <p class="meta">
       
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/">双向链表在Linux Kernel中的实现</a></h1>
-    
-    
-      <p class="meta">
-        
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Jeff Ruan</span></span>
+
+      
 
 
 
@@ -931,204 +922,38 @@
   
 
 
-<time datetime="2014-02-27T05:41:58+08:00" pubdate data-updated="true">Feb 27<span>th</span>, 2014</time>
-        
-      </p>
+<time datetime="2014-03-10T07:26:03+08:00" pubdate data-updated="true">Mar 10<span>th</span>, 2014</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/blog/'>blog</a>
+  
+</span>
+
+
+    </p>
     
-  </header>
+      <div class="sharing">
+  
+  <a href="//twitter.com/share" class="twitter-share-button" data-url="http://jeff66ruan.github.io/blog/2014/03/10/a-piece-of-code-refactoring/" data-via="" data-counturl="http://jeff66ruan.github.io/blog/2014/03/10/a-piece-of-code-refactoring/" >Tweet</a>
+  
+  
+  
+</div>
 
-
-  <div class="entry-content"><p>双向链表是一个简单的数据结构,使用非常广泛，应该人人知道，会用，打开编辑器马上可以写一个。但是Linux的双向链表实现非常巧妙，它使用了一个小小的编程技巧，使得开发人员定义自己的数据结构时添加一个struct list_head字段（list_head是Linux Kernel定义的双向链表的数据结构），就可以使自己的数据结构具备双向链表功能，采用Linux Kernel提供的操作函数，使得使用双向链表非常简单。如果我们在v3.9-rc8中grep list_head，竟然有多达11400多条匹配，可见双向链表在Linux kernel中的江湖地位，实际上，我们在读Linux源码时，到处可以见到以list_head组织起来的数据结构。</p>
-
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/lines-of-list-head.png"></p>
-
-<p>下面我们将详细看看list_head结构及其相关函数，并且用一个简单例子学习如何使用它们。</p>
-
-<h4>list_head结构</h4>
-
-<p>数据结构是代码的核心，我们先来看看双向链表的数据结构。linux kernel在&lt;linux/list.h>中定义了双向链表的数据结构struct list_head。list_head定义很简单，只有两个成员函数next和prev，用于指向list_head：</p>
-
-<figure class='code'><figcaption><span>struct list_head的定义</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="k">struct</span> <span class="n">list_head</span> <span class="p">{</span>
-</span><span class='line'>       <span class="k">struct</span> <span class="n">list_head</span> <span class="o">*</span><span class="n">next</span><span class="p">,</span> <span class="o">*</span><span class="n">prev</span><span class="p">;</span>
-</span><span class='line'><span class="p">};</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<h4>函数列表</h4>
-
-<p>在list_head定义的基础上，Linux kernel提供了丰富的链表操作函数，下表列出了其中一些主要的。所有双向链表的操作都应该使用操作函数，而不应该直接访问list_head内部的next和prev指针，这样当list_head的实现改变时，使用的代码可以不受到影响。</p>
-
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/list-operations.png"></p>
-
-<h4>使用</h4>
-
-<p>Linux kernel的双向列表实现巧妙，只要在我们的数据结构中定义一个struct list_head的字段就可以使我们的数据结构具备双向链表的功能。通过链表提供的操作函数，我们可以创建自己的双向链表。一个创建好的链表为下图所示的组织形式：</p>
-
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/list-head-general.png"></p>
-
-<p>我们可以通过一个例子来具体的理解和体会这个结构的方便简单的使用方式。</p>
-
-<h4>例子</h4>
-
-<h5>定义自己的数据结构</h5>
-
-<p>定义我们的struct my_struct_t结构：</p>
-
-<figure class='code'><figcaption><span>定义my_struct_t</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="k">typedef</span> <span class="k">struct</span> <span class="n">my_struct</span> <span class="p">{</span>
-</span><span class='line'>  <span class="kt">int</span> <span class="n">id</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">struct</span> <span class="n">list_head</span> <span class="n">lists</span><span class="p">;</span>
-</span><span class='line'>  <span class="kt">char</span> <span class="o">*</span><span class="n">name</span><span class="p">;</span>
-</span><span class='line'><span class="p">}</span> <span class="n">my_struct_t</span><span class="p">;</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>struct list_head可以在数据结构中任意位置。上面代码中，我们定义了一个my_struct_t的结构，有三个字段id, lists和name。其中lists申明为struct list_head.</p>
-
-<h5>定义链表头</h5>
-
-<figure class='code'><figcaption><span>定义链表头my_struct_list</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="n">LIST_HEAD</span><span class="p">(</span><span class="n">my_struct_list</span><span class="p">);</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>LIST_HEAD是一个宏，它实际上声明了一个struct list_head变量my_struct_list，并且初始化字段next和prev指向自身。初始化完成之后，my_struct_list实际为如下图所示：</p>
-
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/list-head-zero.png"></p>
-
-<h5>插入一个链表项</h5>
-
-<p>我们可以用list_add(new, head)向在链表头部插入一个链表项。</p>
-
-<figure class='code'><figcaption><span>插入my_struct2到链表</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="n">my_struct_t</span> <span class="n">my_struct2</span> <span class="o">=</span> <span class="p">{.</span><span class="n">id</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
-</span><span class='line'>                          <span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;struct2&quot;</span><span class="p">};</span>
-</span><span class='line'><span class="n">list_add</span><span class="p">(</span><span class="o">&amp;</span><span class="n">my_struct2</span><span class="p">.</span><span class="n">lists</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">my_struct_list</span><span class="p">);</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>插入my_struct2之后，我们看到的链表结构如下图所示：</p>
-
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/list-head-one.png"></p>
-
-<h5>再插入一个链表项</h5>
-
-<figure class='code'><figcaption><span>插入my_struct1到链表</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="n">my_struct_t</span> <span class="n">my_struct1</span> <span class="o">=</span> <span class="p">{.</span><span class="n">id</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-</span><span class='line'>                          <span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">&quot;struct1&quot;</span><span class="p">};</span>
-</span><span class='line'><span class="n">list_add</span><span class="p">(</span><span class="o">&amp;</span><span class="n">my_struct1</span><span class="p">.</span><span class="n">lists</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">my_struct_list</span><span class="p">);</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>插入my_struct1之后，我们看到的链表结构如下图所示：</p>
-
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/list-head-two.png"></p>
-
-<h5>从链表项指针得到原数据结构的指针</h5>
-
-<p>从链表项指针到原数据结构的指针是双向链表使用便利的关键，如果我们得到了一个链表项，可以通过list_entry(ptr, type, member)来得到指向struct list_head嵌入的数据结构的指针。其中ptr是一个指向struct list_head的指针，type是struct list_head嵌入的数据结构，memeber是struct list_head嵌入的字段名。看一个例子会容易明白：</p>
-
-<figure class='code'><figcaption><span>得到指向原数据结构的指针</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="n">my_struct_t</span> <span class="o">*</span><span class="n">my_structp</span> <span class="o">=</span> <span class="n">list_entry</span><span class="p">(</span><span class="n">my_struct_list</span><span class="p">.</span><span class="n">next</span><span class="p">,</span> <span class="n">my_struct_t</span><span class="p">,</span> <span class="n">lists</span><span class="p">);</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>my_structp会指向上述链表结构中my_struct1，和下述赋值语句等效</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="n">my_structp</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">my_struct1</span><span class="p">;</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>大家可能对list_entry如何实现比较好奇，下面是简化的源代码，使用了c中一个常见的技巧：</p>
-
-<figure class='code'><figcaption><span>list_entry的实现</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="cp">#define list_entry(ptr, type, member) \</span>
-</span><span class='line'><span class="cp">          (type *) ((char *) ptr - offset(type, memeber);</span>
-</span><span class='line'>
-</span><span class='line'><span class="cp">#define offsetof(TYPE, MEMBER) ((size_t) &amp;((TYPE *)0)-&gt;MEMBER)</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>offsetof计算字段MEMBER在类型TYPE中的偏移，这个偏移在编译的时候就由编译器计算得到。list_entry将链表项的指针减去list_head字段的偏移就得到了原数据结构的指针。</p>
-
-<h5>遍历整个链表list_for_each和list_for_each_entry</h5>
-
-<p>使用list_for_each(pos, head)可以遍历整个链表的链表项，head是链表头，pos是指向当前链表项的指针，每次循环时，pos都会更新为下一个链表项，下面例子打印列表中的id和name：</p>
-
-<figure class='code'><figcaption><span>遍历一</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="k">struct</span> <span class="n">list_head</span> <span class="o">*</span><span class="n">pos</span><span class="p">;</span>
-</span><span class='line'><span class="n">my_struct_t</span> <span class="o">*</span><span class="n">my_structp</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'><span class="n">list_for_each</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">my_struct_list</span><span class="p">)</span> <span class="p">{</span>
-</span><span class='line'>  <span class="n">my_structp</span> <span class="o">=</span> <span class="n">list_entry</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">my_struct_t</span><span class="p">,</span> <span class="n">lists</span><span class="p">);</span>
-</span><span class='line'>  <span class="n">printf</span><span class="p">(</span><span class="s">&quot;id=%d, name=%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">my_structp</span><span class="o">-&gt;</span><span class="n">id</span><span class="p">,</span> <span class="n">my_structp</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">);</span>
-</span><span class='line'><span class="p">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>输出</p>
-
-<blockquote><p>id=1, name=struct1
-id=2, name=struct2</p></blockquote>
-
-<p>list_for_each_entry(pos, head, member)可以遍历整个链表的原数据结构，head是链表头，pos为指向当前链表项所嵌入的原数据结构的指针，member是被嵌入数据结构struct list_head申明的字段名。实际上是list_for_each和list_entry的组合，所以上段代码也可以写成下面的方式，看起来更加简洁：</p>
-
-<figure class='code'><figcaption><span>遍历二</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="n">my_struct_t</span> <span class="o">*</span><span class="n">my_structp</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'><span class="n">list_for_each_entry</span><span class="p">(</span><span class="n">my_structp</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">my_struct_list</span><span class="p">,</span> <span class="n">lists</span><span class="p">)</span> <span class="p">{</span>
-</span><span class='line'>  <span class="n">printf</span><span class="p">(</span><span class="s">&quot;id=%d, name=%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">my_structp</span><span class="o">-&gt;</span><span class="n">id</span><span class="p">,</span> <span class="n">my_structp</span><span class="o">-</span><span class="n">name</span><span class="p">);</span>
-</span><span class='line'><span class="p">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<h4>总结</h4>
-
-<ol>
-<li>使用双向链表需要在自己的数据结构中申明一个struct list_head的字段，定义的数据结构通过这个字段链接起来</li>
-<li>使用LIST_HEAD宏申明一个链表头，这个链表头指向双向链表</li>
-<li>使用&lt;linux/list.h>提供的add，delete等操作函数管理链表</li>
-<li>通过list_entry及其他_entry结尾的函数得到原数据结构的指针，list_entry的实现采用了一个小技巧，是链表方便易用的原因</li>
-</ol>
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/" title="Previous Post: 双向链表在Linux Kernel中的实现">&laquo; 双向链表在Linux Kernel中的实现</a>
+      
+      
+    </p>
+  </footer>
+</article>
 
 </div>
-  
-  
 
-
-    </article>
-  
-  <div class="pagination">
-    
-    <a href="/blog/archives">Blog Archives</a>
-    
-  </div>
-</div>
 <aside class="sidebar">
   
     <section>
@@ -1152,6 +977,7 @@ id=2, name=struct2</p></blockquote>
 
   
 </aside>
+
 
     </div>
   </div>
