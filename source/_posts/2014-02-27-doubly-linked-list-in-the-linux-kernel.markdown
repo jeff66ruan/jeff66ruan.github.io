@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 双向链表在Linux Kernel中的实现
+title: "双向链表在Linux Kernel中的实现"
 date: 2014-02-27 05:41:58 +0800
 comments: true
 categories: blog
