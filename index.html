@@ -31,6 +31,19 @@
 <link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
 
   
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-48990941-1']);
+    _gaq.push(['_setDomainName', 'github.io']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
 
 </head>
 
@@ -96,7 +109,7 @@
 
   <div class="entry-content"><h3>为什么要对这段代码重构</h3>
 
-<p>上周对一段代码进行了重构，这段代码是参加一个小组的code review时读到的，这段代码并不长，只有100多行，我花了几个小时（也许两个小时），但是没有读明白这段代码是如何工作的。因为代码可读性不好，代码阅读者的时间就这样被浪费了而没有任何收获。而且代码的书写者在一段时间后也会面临同样的问题，他／她至少需要一点时间才能明白代码如何工作的。还有很重要的一点是，从长远来看，这样的代码可维护性也不高，引入新的改动会比较难或者比较容易引入新的bug。为了避免下一个代码阅读者掉入同样的一个“坑”，我决定对代码重构。</p>
+<p>上周对一段代码进行了重构，这段代码是参加一个小组的code review时读到的，这段代码并不长，只有100多行，我花了几个小时（也许两个小时），但是没有读明白这段代码是如何工作的。因为代码可读性不好，代码阅读者的时间就这样被浪费了而没有任何收获。而且代码的书写者在一段时间后也会面临同样的问题，他／她至少需要一点时间才能明白代码如何工作的。还有很重要的一点是，从长远来看，这样的代码可维护性也不高，引入新的改动会比较难或者比较容易引入新的bug。为了避免下一个代码阅读者掉入同样的一个“坑”，我提出需要对代码重构。</p>
 
 <h3>为什么可读性不高</h3>
 
@@ -117,6 +130,8 @@
 <p>流程图没有经过简化，有一部分模块是重复的，但是可以让我们理解原代码的意图是什么。可以看到原代码将整个流程都在一个do &hellip; while中实现了，这就导致代码结构不清晰。</p>
 
 <h3>代码重构中遵循的一些原则</h3>
+
+<p>重构后的代码请看后面，那么重构中遵循了哪些原则呢？并不复杂，只要写代码过程中，留意下面几条原则，代码的可读性就可以得到极大的提高。</p>
 
 <ul>
 <li>给变量和函数一个可读性好的名字，正如我们在clean code中学到的</li>
