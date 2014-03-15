@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 
-  <title><![CDATA[Category: Blog | For Fun and Logging]]></title>
-  <link href="http://jeff66ruan.github.io/blog/categories/blog/atom.xml" rel="self"/>
+  <title><![CDATA[Category: Code | For Fun and Logging]]></title>
+  <link href="http://jeff66ruan.github.io/blog/categories/code/atom.xml" rel="self"/>
   <link href="http://jeff66ruan.github.io/"/>
-  <updated>2014-03-14T14:36:37+08:00</updated>
+  <updated>2014-03-15T13:28:38+08:00</updated>
   <id>http://jeff66ruan.github.io/</id>
   <author>
     <name><![CDATA[Jeff Ruan]]></name>
