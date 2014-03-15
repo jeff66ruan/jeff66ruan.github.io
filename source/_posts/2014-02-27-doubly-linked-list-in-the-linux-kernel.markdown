@@ -3,7 +3,9 @@ layout: post
 title: "双向链表在Linux Kernel中的实现"
 date: 2014-02-27 05:41:58 +0800
 comments: true
-categories: blog
+categories: [Linux,code]
+keywords: Linux,data structure, doubly linked list, list_head, list.h, implementation,数据结构,双向链表,实现
+description: Linux双向链表的笔记
 ---
 
 

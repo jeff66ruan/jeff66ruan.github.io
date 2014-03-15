@@ -3,7 +3,9 @@ layout: post
 title: "一段代码的重构"
 date: 2014-03-10 07:26:03 +0800
 comments: true
-categories: blog
+categories: code
+keywords: code refactoring,experience, 代码重构,经验
+description: 一段代码重构的经验
 ---
 
 
