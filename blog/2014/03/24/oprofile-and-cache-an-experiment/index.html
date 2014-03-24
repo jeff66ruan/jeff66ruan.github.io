@@ -1,0 +1,668 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Oprofile and Memory Cache - an Experiment - For Fun and Logging</title>
+  <meta name="author" content="Jeff Ruan">
+
+  
+  <meta name="description" content="This is an experiment to show how to use oprofile profiling memory cache and performance of a piece of code">
+  <meta name="keywords" content="cache, Linux, oprofile, memory, performance, profile">
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://jeff66ruan.github.io/blog/2014/03/24/oprofile-and-cache-an-experiment">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="For Fun and Logging" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-48990941-1']);
+    _gaq.push(['_setDomainName', 'github.io']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">For Fun and Logging</a></h1>
+  
+    <h2>Linux & Code</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:jeff66ruan.github.io" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Oprofile and Memory Cache - an Experiment</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-03-24T11:03:38+08:00" pubdate data-updated="true">Mar 24<span>th</span>, 2014</time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>Last week, I did a small experiment of using oprofile to profile two piece of code. In this small experiment, I learned some basic ideas of using oprofile. In particular, I used oprofile to profile memory cache behaviour and the performance effect. In this experiment, I got ideas of how memory cache invalidation can affect the speed of running program. The following is the detail.</p>
+
+<h3>The Experiment Configuration</h3>
+
+<p>I ran the experiment in an Thinkpad T400 with a Ubuntu installation. The experiment needs to run on a multi-core processor because of profiling memory cache invalidation cost. In a single core processor, there is no such memory cache invalidation cost.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>$sudo lsb_release -a
+</span><span class='line'>No LSB modules are available.
+</span><span class='line'>Distributor ID: Ubuntu
+</span><span class='line'>Description:    Ubuntu 12.04 LTS
+</span><span class='line'>Release:        12.04
+</span><span class='line'>Codename:       precise
+</span><span class='line'>
+</span><span class='line'>$ cat /proc/cpuinfo |grep "model name"
+</span><span class='line'>model name      : Intel(R) Core(TM)2 Duo CPU     P8600  @ 2.40GHz
+</span><span class='line'>model name      : Intel(R) Core(TM)2 Duo CPU     P8600  @ 2.40GHz</span></code></pre></td></tr></table></div></figure>
+
+
+<h3>Source Code</h3>
+
+<p>There are two pieces of programs, which are &ldquo;no_alignment&rdquo; and &ldquo;alignment&rdquo;. They are compiled with GNU GCC. Each program clones a child sharing the same memory address space, which means the parent and the child updating different fileds of the same global data. The difference is that the program &ldquo;alignment&rdquo; optimizing the fields of the shared_data to the cache line size alignment. In this way, the two fields are able to be fetched on different cache lines. Therefore, when the parent and the child runs on different cores, the &ldquo;no_alignment&rdquo; program has the cache invlidation costs between two cores, but the &ldquo;alignment&rdquo; program doesn&rsquo;t.</p>
+
+<p>The following are the source codes of the two programs. The only difference is the definition of struct shared_data.</p>
+
+<figure class='code'><figcaption><span>no_alignment</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="cp">#define _GNU_SOURCE</span>
+</span><span class='line'><span class="cp">#include &lt;sched.h&gt;</span>
+</span><span class='line'><span class="cp">#include &lt;stdio.h&gt;</span>
+</span><span class='line'><span class="cp">#include &lt;errno.h&gt;</span>
+</span><span class='line'><span class="cp">#include &lt;stdlib.h&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// shared data</span>
+</span><span class='line'><span class="k">struct</span> <span class="n">shared_data</span> <span class="p">{</span>
+</span><span class='line'>  <span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">num_proc1</span><span class="p">;</span>
+</span><span class='line'>  <span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">num_proc2</span><span class="p">;</span>
+</span><span class='line'><span class="p">};</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">struct</span> <span class="n">shared_data</span> <span class="n">shared</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// define loops to run for a while</span>
+</span><span class='line'><span class="kt">int</span> <span class="n">loop_i</span> <span class="o">=</span> <span class="mi">100000</span><span class="p">,</span> <span class="n">loop_j</span> <span class="o">=</span> <span class="mi">100000</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="nf">child</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'><span class="cp">#define STACK_SIZE (8 * 1024)</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>  <span class="n">pid_t</span> <span class="n">pid</span><span class="p">;</span>
+</span><span class='line'>  <span class="kt">int</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/* Stack */</span>
+</span><span class='line'>  <span class="kt">char</span> <span class="o">*</span><span class="n">stack</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="n">STACK_SIZE</span><span class="p">);</span>
+</span><span class='line'>  <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">stack</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>    <span class="n">perror</span><span class="p">(</span><span class="s">&quot;malloc&quot;</span><span class="p">);</span>
+</span><span class='line'>    <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">printf</span><span class="p">(</span><span class="s">&quot;main: shared %p %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+</span><span class='line'>         <span class="o">&amp;</span><span class="n">shared</span><span class="p">.</span><span class="n">num_proc1</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">shared</span><span class="p">.</span><span class="n">num_proc2</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/* clone a thread sharing memory space with the parent process */</span>
+</span><span class='line'>  <span class="k">if</span> <span class="p">((</span><span class="n">pid</span> <span class="o">=</span> <span class="n">clone</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">stack</span> <span class="o">+</span> <span class="n">STACK_SIZE</span><span class="p">,</span> <span class="n">CLONE_VM</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>    <span class="n">perror</span><span class="p">(</span><span class="s">&quot;clone&quot;</span><span class="p">);</span>
+</span><span class='line'>    <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">loop_i</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>    <span class="k">for</span><span class="p">(</span><span class="n">j</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">loop_j</span><span class="p">;</span> <span class="n">j</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>      <span class="n">shared</span><span class="p">.</span><span class="n">num_proc1</span><span class="o">++</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="nf">child</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="n">arg</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>  <span class="kt">int</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">printf</span><span class="p">(</span><span class="s">&quot;child: shared %p %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+</span><span class='line'>         <span class="o">&amp;</span><span class="n">shared</span><span class="p">.</span><span class="n">num_proc1</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">shared</span><span class="p">.</span><span class="n">num_proc2</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">loop_i</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>    <span class="k">for</span> <span class="p">(</span><span class="n">j</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">loop_j</span><span class="p">;</span> <span class="n">j</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>      <span class="n">shared</span><span class="p">.</span><span class="n">num_proc2</span><span class="o">++</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span>alignment</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="cp">#define _GNU_SOURCE</span>
+</span><span class='line'><span class="cp">#include &lt;sched.h&gt;</span>
+</span><span class='line'><span class="cp">#include &lt;stdio.h&gt;</span>
+</span><span class='line'><span class="cp">#include &lt;errno.h&gt;</span>
+</span><span class='line'><span class="cp">#include &lt;stdlib.h&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// cache line size</span>
+</span><span class='line'><span class="c1">// hardware dependent value</span>
+</span><span class='line'><span class="c1">// it can checks from /proc/cpuinfo</span>
+</span><span class='line'><span class="cp">#define CACHE_LINE_SIZE 64</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// shared data aligned with cache line size</span>
+</span><span class='line'><span class="k">struct</span> <span class="n">shared_data</span> <span class="p">{</span>
+</span><span class='line'>  <span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">__attribute__</span> <span class="p">((</span><span class="n">aligned</span> <span class="p">(</span><span class="n">CACHE_LINE_SIZE</span><span class="p">)))</span> <span class="n">num_proc1</span><span class="p">;</span>
+</span><span class='line'>  <span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">__attribute__</span> <span class="p">((</span><span class="n">aligned</span> <span class="p">(</span><span class="n">CACHE_LINE_SIZE</span><span class="p">)))</span> <span class="n">num_proc2</span><span class="p">;</span>
+</span><span class='line'><span class="p">};</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">struct</span> <span class="n">shared_data</span> <span class="n">shared</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// define loops to run for a while</span>
+</span><span class='line'><span class="kt">int</span> <span class="n">loop_i</span> <span class="o">=</span> <span class="mi">100000</span><span class="p">,</span> <span class="n">loop_j</span> <span class="o">=</span> <span class="mi">100000</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="nf">child</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'><span class="cp">#define STACK_SIZE (8 * 1024)</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>  <span class="n">pid_t</span> <span class="n">pid</span><span class="p">;</span>
+</span><span class='line'>  <span class="kt">int</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/* Stack */</span>
+</span><span class='line'>  <span class="kt">char</span> <span class="o">*</span><span class="n">stack</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="n">STACK_SIZE</span><span class="p">);</span>
+</span><span class='line'>  <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">stack</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>    <span class="n">perror</span><span class="p">(</span><span class="s">&quot;malloc&quot;</span><span class="p">);</span>
+</span><span class='line'>    <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">printf</span><span class="p">(</span><span class="s">&quot;main: shared %p %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+</span><span class='line'>         <span class="o">&amp;</span><span class="n">shared</span><span class="p">.</span><span class="n">num_proc1</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">shared</span><span class="p">.</span><span class="n">num_proc2</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/* clone a thread sharing memory space with the parent process */</span>
+</span><span class='line'>  <span class="k">if</span> <span class="p">((</span><span class="n">pid</span> <span class="o">=</span> <span class="n">clone</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">stack</span> <span class="o">+</span> <span class="n">STACK_SIZE</span><span class="p">,</span> <span class="n">CLONE_VM</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>    <span class="n">perror</span><span class="p">(</span><span class="s">&quot;clone&quot;</span><span class="p">);</span>
+</span><span class='line'>    <span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">loop_i</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>    <span class="k">for</span><span class="p">(</span><span class="n">j</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">loop_j</span><span class="p">;</span> <span class="n">j</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>      <span class="n">shared</span><span class="p">.</span><span class="n">num_proc1</span><span class="o">++</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="nf">child</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="n">arg</span><span class="p">)</span>
+</span><span class='line'><span class="p">{</span>
+</span><span class='line'>  <span class="kt">int</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">printf</span><span class="p">(</span><span class="s">&quot;child: shared %p %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+</span><span class='line'>         <span class="o">&amp;</span><span class="n">shared</span><span class="p">.</span><span class="n">num_proc1</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">shared</span><span class="p">.</span><span class="n">num_proc2</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">loop_i</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>    <span class="k">for</span> <span class="p">(</span><span class="n">j</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">loop_j</span><span class="p">;</span> <span class="n">j</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>      <span class="n">shared</span><span class="p">.</span><span class="n">num_proc2</span><span class="o">++</span><span class="p">;</span>
+</span><span class='line'>    <span class="p">}</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h3>Testing</h3>
+
+<p>I was using the Oprofile 0.99 which has &lsquo;operf&rsquo; program that allows non-root users to profile a specified individual process with less setup. Different CPUs have different supported events. The supported events, their meanings and accepted event format by operf can be checked from ophelp and the CPU&rsquo;s hardware manual. In this experiment, the CLOCK event is CPU_CLK_UNHALTED and L2_LINES_IN is the number of allocated lines in L2 which is L2 cache missing number. As examples, the &ldquo;CPU_CLK_UNHALTED:100000&rdquo; tells operf to sample every 100000 unhalted clock with default mask(unhalted core cycles). The &ldquo;L2_LINES_IN:100000:0xf0&rdquo; tells operf to sample every 1000000 number of allocated lines in L2 on all cores with all prefetch inclusive.</p>
+
+<p>The following is the experiment results.</p>
+
+<figure class='code'><figcaption><span>profiling result of alignment</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$time</span> operf --event<span class="o">=</span>CPU_CLK_UNHALTED:100000,L2_LINES_IN:100000:0xf0 ./alignment
+</span><span class='line'>
+</span><span class='line'>operf: Profiler started
+</span><span class='line'>main: shared 0x6010c0 0x601100
+</span><span class='line'>child: shared 0x6010c0 0x601100
+</span><span class='line'>
+</span><span class='line'>profiled app exited with the following status: 160
+</span><span class='line'>
+</span><span class='line'>Profiling <span class="k">done</span>.
+</span><span class='line'>
+</span><span class='line'>real    0m41.373s
+</span><span class='line'>user    0m54.015s
+</span><span class='line'>sys     0m0.728s
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'><span class="nv">$opreport</span>
+</span><span class='line'>Using /home/work/oprof_cache/oprofile_data/samples/ <span class="k">for </span>samples directory.
+</span><span class='line'>CPU: Core 2, speed 2.401e+06 MHz <span class="o">(</span>estimated<span class="o">)</span>
+</span><span class='line'>Counted CPU_CLK_UNHALTED events <span class="o">(</span>Clock cycles when not halted<span class="o">)</span> with a unit mask of 0x00 <span class="o">(</span>Unhalted core cycles<span class="o">)</span> count 100000
+</span><span class='line'>Counted L2_LINES_IN events <span class="o">(</span>number of allocated lines in L2<span class="o">)</span> with a unit mask of 0xf0 <span class="o">(</span>multiple flags<span class="o">)</span> count 100000
+</span><span class='line'>CPU_CLK_UNHALT...|L2_LINES_IN:10...|
+</span><span class='line'>  samples|      %|  samples|      %|
+</span><span class='line'>------------------------------------
+</span><span class='line'>   939093 100.000    396933 100.000 alignment
+</span><span class='line'>        CPU_CLK_UNHALT...|L2_LINES_IN:10...|
+</span><span class='line'>          samples|      %|  samples|      %|
+</span><span class='line'>        ------------------------------------
+</span><span class='line'>           936430 99.7164    395920 99.7448 alignment
+</span><span class='line'>             2657  0.2829      1013  0.2552 no-vmlinux
+</span><span class='line'>                5 5.3e-04         0       0 ld-2.15.so
+</span><span class='line'>                1 1.1e-04         0       0 libc-2.15.so
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span>profiling result of no_alignment</span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$time</span> operf --event<span class="o">=</span>CPU_CLK_UNHALTED:100000,L2_LINES_IN:100000:0xf0 ./no_alignment
+</span><span class='line'>operf: Profiler started
+</span><span class='line'>main: shared 0x601058 0x60105c
+</span><span class='line'>child: shared 0x601058 0x60105c
+</span><span class='line'>profiled app exited with the following status: 160
+</span><span class='line'>
+</span><span class='line'>Profiling <span class="k">done</span>.
+</span><span class='line'>
+</span><span class='line'>real    1m24.739s
+</span><span class='line'>user    1m59.167s
+</span><span class='line'>sys     0m1.344s
+</span><span class='line'>
+</span><span class='line'><span class="nv">$opreport</span>
+</span><span class='line'>Using /home/work/oprof_cache/oprofile_data/samples/ <span class="k">for </span>samples directory.
+</span><span class='line'>CPU: Core 2, speed 2.401e+06 MHz <span class="o">(</span>estimated<span class="o">)</span>
+</span><span class='line'>Counted CPU_CLK_UNHALTED events <span class="o">(</span>Clock cycles when not halted<span class="o">)</span> with a unit mask of 0x00 <span class="o">(</span>Unhalted core cycles<span class="o">)</span> count 100000
+</span><span class='line'>Counted L2_LINES_IN events <span class="o">(</span>number of allocated lines in L2<span class="o">)</span> with a unit mask of 0xf0 <span class="o">(</span>multiple flags<span class="o">)</span> count 100000
+</span><span class='line'>CPU_CLK_UNHALT...|L2_LINES_IN:10...|
+</span><span class='line'>  samples|      %|  samples|      %|
+</span><span class='line'>------------------------------------
+</span><span class='line'>  1423030 100.000   1177262 100.000 no_alignment
+</span><span class='line'>        CPU_CLK_UNHALT...|L2_LINES_IN:10...|
+</span><span class='line'>          samples|      %|  samples|      %|
+</span><span class='line'>        ------------------------------------
+</span><span class='line'>          1419249 99.7343   1174038 99.7261 no_alignment
+</span><span class='line'>             3778  0.2655      3224  0.2739 no-vmlinux
+</span><span class='line'>                2 1.4e-04         0       0 ld-2.15.so
+</span><span class='line'>                1 7.0e-05         0       0 libc-2.15.so
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h3>Analysis and Conclusion</h3>
+
+<p>I drawed the table for the analysising.</p>
+
+<p><img src="media/Oprofile-and-Cache/Oprofile-and-Cache.png"></p>
+
+<p>Here is the conclusion:</p>
+
+<ul>
+<li>The cache missing rate of no_alignment was 82.73%. It became 42.27% with alignment optimization. The cache missing rate was reduced to almost half.</li>
+<li>The no_alignment ran 120.5 seconds and the alignment ran 55 seconds. It was a bit more than double faster with alignment optimization.</li>
+</ul>
+
+
+<blockquote><p><strong>NOTE:</strong> The real time is less than user + sys because the program runs on mutlecores parallel</p></blockquote>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Jeff Ruan</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-03-24T11:03:38+08:00" pubdate data-updated="true">Mar 24<span>th</span>, 2014</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/linux/'>Linux</a>, <a class='category' href='/blog/categories/code/'>code,</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="//twitter.com/share" class="twitter-share-button" data-url="http://jeff66ruan.github.io/blog/2014/03/24/oprofile-and-cache-an-experiment/" data-via="" data-counturl="http://jeff66ruan.github.io/blog/2014/03/24/oprofile-and-cache-an-experiment/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/03/10/a-piece-of-code-refactoring/" title="Previous Post: 一段代码的重构">&laquo; 一段代码的重构</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/03/24/oprofile-and-cache-an-experiment/">Oprofile and Memory Cache - an Experiment</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/03/10/a-piece-of-code-refactoring/">一段代码的重构</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/">双向链表在Linux Kernel中的实现</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - Jeff Ruan -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = '//platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>
