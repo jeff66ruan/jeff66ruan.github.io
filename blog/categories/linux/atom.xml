@@ -4,7 +4,7 @@
   <title><![CDATA[Category: Linux | For Fun and Logging]]></title>
   <link href="http://jeff66ruan.github.io/blog/categories/linux/atom.xml" rel="self"/>
   <link href="http://jeff66ruan.github.io/"/>
-  <updated>2014-03-24T17:42:12+08:00</updated>
+  <updated>2014-04-01T09:55:41+08:00</updated>
   <id>http://jeff66ruan.github.io/</id>
   <author>
     <name><![CDATA[Jeff Ruan]]></name>
@@ -12,6 +12,39 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[SigPnd, ShdPnd, SigBlk, SigIgn and SigCgt Fields in Proc Information File System]]></title>
+    <link href="http://jeff66ruan.github.io/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file/"/>
+    <updated>2014-03-31T20:59:51+08:00</updated>
+    <id>http://jeff66ruan.github.io/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file</id>
+    <content type="html"><![CDATA[<p>The following is the field definition from Linux man proc(5).</p>
+
+<blockquote><p>SigPnd, ShdPnd: Number of signals pending for thread and for process as a whole (see pthreads(7) and signal(7)).</p>
+
+<p>SigBlk, SigIgn, SigCgt: Masks indicating signals being blocked, ignored, and caught (see signal(7)).</p></blockquote>
+
+<p>But what they look like and how to interpret? Here is an output example:</p>
+
+<blockquote><p>SigPnd: 0000000000000000
+ShdPnd: 0000000000000000
+SigBlk: fffffffe7ffbfeff
+SigIgn: 0000000000000000
+SigCgt: 0000000000000000</p></blockquote>
+
+<p>They are displayed in hex format as 8 bytes. The right most 4 bytes represent stardard signals, the left is Linux real-time signal extension. Each bit in the 8 bytes represents one corresponding signal. If the bits index starts from zero(the right most bit in the above), The corresponding signal is represented by bit[signalValue-1]. An example is that the signal SIGHUP, whose value is 1, is represented the bit 0.</p>
+
+<p>Take the above SigBlk as example, the first two bytes are</p>
+
+<blockquote><p>0xfeff</p></blockquote>
+
+<p>The binary format is</p>
+
+<blockquote><p>1111,1110,1111,1111</p></blockquote>
+
+<p>It means all signals from 1 to 16 are blocked except the signal 9 (SIGKILL). This is true because SIGKILL cannot be blocked or ignored.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Oprofile and Memory Cache - an Experiment]]></title>

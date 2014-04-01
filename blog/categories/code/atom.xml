@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 
-  <title><![CDATA[Category: Code | For Fun and Logging]]></title>
+  <title><![CDATA[Category: Code, | For Fun and Logging]]></title>
   <link href="http://jeff66ruan.github.io/blog/categories/code/atom.xml" rel="self"/>
   <link href="http://jeff66ruan.github.io/"/>
-  <updated>2014-03-24T17:42:12+08:00</updated>
+  <updated>2014-04-01T09:55:41+08:00</updated>
   <id>http://jeff66ruan.github.io/</id>
   <author>
     <name><![CDATA[Jeff Ruan]]></name>
@@ -14,983 +14,307 @@
 
   
   <entry>
-    <title type="html"><![CDATA[一段代码的重构]]></title>
-    <link href="http://jeff66ruan.github.io/blog/2014/03/10/a-piece-of-code-refactoring/"/>
-    <updated>2014-03-10T07:26:03+08:00</updated>
-    <id>http://jeff66ruan.github.io/blog/2014/03/10/a-piece-of-code-refactoring</id>
-    <content type="html"><![CDATA[<h3>为什么要对这段代码重构</h3>
+    <title type="html"><![CDATA[Oprofile and Memory Cache - an Experiment]]></title>
+    <link href="http://jeff66ruan.github.io/blog/2014/03/24/oprofile-and-cache-an-experiment/"/>
+    <updated>2014-03-24T11:03:38+08:00</updated>
+    <id>http://jeff66ruan.github.io/blog/2014/03/24/oprofile-and-cache-an-experiment</id>
+    <content type="html"><![CDATA[<p>Last week, I did a small experiment of using oprofile to profile two piece of code. In this small experiment, I learned some basic ideas of using oprofile. In particular, I used oprofile to profile memory cache behaviour and the performance effect. In this experiment, I got ideas of how memory cache invalidation can affect the speed of running program. The following is the detail.</p>
 
-<p>上周对一段代码进行了重构，这段代码是参加一个小组的code review时读到的，这段代码并不长，只有100多行，我花了几个小时（也许两个小时），但是没有读明白这段代码是如何工作的。因为代码可读性不好，代码阅读者的时间就这样被浪费了而没有任何收获。而且代码的书写者在一段时间后也会面临同样的问题，他／她至少需要一点时间才能明白代码如何工作的。还有很重要的一点是，从长远来看，这样的代码可维护性也不高，引入新的改动会比较难或者比较容易引入新的bug。为了避免下一个代码阅读者掉入同样的一个“坑”，我提出需要对代码重构。</p>
+<h3>The Experiment Configuration</h3>
 
-<h3>为什么可读性不高</h3>
+<p>I ran the experiment in an Thinkpad T400 with a Ubuntu installation. The experiment needs to run on a multi-core processor because of profiling memory cache invalidation cost. In a single core processor, there is no such memory cache invalidation cost.</p>
 
-<p>原始代码请看后面，它的可读性不好主要体现在以下几点：</p>
+<p>```
+$sudo lsb_release -a
+No LSB modules are available.
+Distributor ID: Ubuntu
+Description:    Ubuntu 12.04 LTS
+Release:        12.04
+Codename:       precise</p>
 
-<ul>
-<li>变量的命名可读性。比如dummy命名为isdummy，peek_dummy命名为next_msg_isdummy的可读性会更好，sleep_entry实际上就是!q->msg_queue_pending_msgs变量有重复之嫌。关于如何命名可以参考<a href="http://www.amazon.com/Clean-Code-Handbook-Software-Craftsmanship/dp/0132350882/ref=sr_1_1?ie=UTF8&amp;qid=1394416932&amp;sr=8-1&amp;keywords=clean+code" title="Clean Code: A Handbook of Agile Software Craftsmanship">clean code</a>。</li>
-<li>do &hellip; while的循环条件是一个长条件(((*head == NULL) &amp;&amp; !sleep_entry) || (dummy &amp;&amp; sleep_entry) || unlikely(peek_dummy))，难读懂，这是造成可读性不好的主要原因，其实际体现出来的是代码的逻辑（或者流程）不清晰</li>
-<li>函数的长度很长。并不是说长函数的可读性一定有问题，但是长函数往往是有问题，它通常反映代码书写者对代码没有进行很好的抽象。抽象是书写代码最终要的一种能力，如果我们打开备受<a href="http://norvig.com/" title="Peter Norvig">Peter Norvig</a>推崇的<a href="http://mitpress.mit.edu/sicp/full-text/book/book.html" title="Structure and Interpretation of Computer Programs">Structure and Interpretation of Computer Programs</a>一书，它的第一章就是Building Abstractions with Procedures</li>
-<li>注释太少，一些需要注释的而没有，例如上面提到的do &hellip; while循环的三个条件</li>
-</ul>
-
-
-<p>通过与拥有这段代码的小组讨论之后，代码的意图实际上如下面的流程图所示：</p>
-
-<p><img src="media/a-piece-of-code-refactoring/flowchart.png"></p>
-
-<p>流程图没有经过简化，有一部分模块是重复的，但是可以让我们理解原代码的意图是什么。可以看到原代码将整个流程都在一个do &hellip; while中实现了，这就导致代码结构不清晰。</p>
-
-<h3>代码重构中遵循的一些原则</h3>
-
-<p>重构后的代码请看后面，那么重构中遵循了哪些原则呢？并不复杂，只要写代码过程中，留意下面几条原则，代码的可读性就可以得到极大的提高。</p>
-
-<ul>
-<li>给变量和函数一个可读性好的名字，正如我们在clean code中学到的</li>
-<li>给if, when, switch等中的逻辑条件（condition）一个体现意图的可读性强的名字，这个condition可以是变量判断或者函数返回值实现的。</li>
-<li>保持函数在一个合理的长度</li>
-<li>在必要的时候画流程图可以解决混乱，注意这里流程图画的是我们希望代码做什么，而不是我们已经写的代码的流程图，这点很重要，因为我们要写出是执行我们意图的代码</li>
-<li>DRY principle，即不要在不同的代码重复相同的代码和信息</li>
-<li>就象写完文章之前最后再把文章读一边，在提交代码前把代码再读一边，通常我们都可以发现一些改进的点。不要担心这会导致无止无=尽的修改，最终我们会到达一个我们能接受的点，另外deadline也会迫使我们在适当的时候停下。</li>
-</ul>
-
-
-<h3>重构之后的一些反思</h3>
-
-<ul>
-<li>我始终认为代码的可读性是最重要的，尤其是现在代码的开发都是团队合作的结果。虽然重构后的代码有将近200多行，这是因为有更多的函数，注释和空格。但新的代码可读性更好，长远看更容易维护（意味着成本更低）</li>
-<li>写可读性强的代码需要时间，所以在计划和估计任务时请考虑这点</li>
-<li>可读性好的代码不是一蹴而就的，好的代码通常是通过反复的、慢慢的改进而来，我想这就是为什么需要经常性的代码重构的思想的来源</li>
-<li>可读性好的代码让读代码的人获得乐趣，写代码的人也会因为写了一份好的代码而获得乐趣</li>
-<li>也许一开始我们写可读性好的代码会有难度或者觉得花费时间，但是只要坚持上述提到的原则，早晚我们可以又快又好的写出漂亮的代码</li>
-<li>保持stupid simple，就象功夫，花巧并不一定好，真正的高手只用基础招数的组合</li>
-<li>没有UT也可以重构，也不影响写出一个好的代码，但是看下一条</li>
-<li>当代码提交后，新代码review之后，碰到的一个问题是：是否应该将新代码提交，这样的犹豫是因为没有足够的UT和funtional测试。完全可以理解，所以这就是为什么需要UT和CI。当然我这里也有个疑惑就是Linux Kernel开发没有UT，那么在Linuxe Kernel的演化过程中，它的开发人员是如何获得这样的信心的</li>
-</ul>
-
-
-<h3>重构前的代码</h3>
-
-<p><div class='bogus-wrapper'><notextile><figure class='code'><figcaption><span>[原始代码]  (recv_whole_msg_origin.c)</span> <a href='/downloads/code/a-piece-of-code-refactoring/recv_whole_msg_origin.c'>download</a></figcaption>
-<div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-<span class='line-number'>54</span>
-<span class='line-number'>55</span>
-<span class='line-number'>56</span>
-<span class='line-number'>57</span>
-<span class='line-number'>58</span>
-<span class='line-number'>59</span>
-<span class='line-number'>60</span>
-<span class='line-number'>61</span>
-<span class='line-number'>62</span>
-<span class='line-number'>63</span>
-<span class='line-number'>64</span>
-<span class='line-number'>65</span>
-<span class='line-number'>66</span>
-<span class='line-number'>67</span>
-<span class='line-number'>68</span>
-<span class='line-number'>69</span>
-<span class='line-number'>70</span>
-<span class='line-number'>71</span>
-<span class='line-number'>72</span>
-<span class='line-number'>73</span>
-<span class='line-number'>74</span>
-<span class='line-number'>75</span>
-<span class='line-number'>76</span>
-<span class='line-number'>77</span>
-<span class='line-number'>78</span>
-<span class='line-number'>79</span>
-<span class='line-number'>80</span>
-<span class='line-number'>81</span>
-<span class='line-number'>82</span>
-<span class='line-number'>83</span>
-<span class='line-number'>84</span>
-<span class='line-number'>85</span>
-<span class='line-number'>86</span>
-<span class='line-number'>87</span>
-<span class='line-number'>88</span>
-<span class='line-number'>89</span>
-<span class='line-number'>90</span>
-<span class='line-number'>91</span>
-<span class='line-number'>92</span>
-<span class='line-number'>93</span>
-<span class='line-number'>94</span>
-<span class='line-number'>95</span>
-<span class='line-number'>96</span>
-<span class='line-number'>97</span>
-<span class='line-number'>98</span>
-<span class='line-number'>99</span>
-<span class='line-number'>100</span>
-<span class='line-number'>101</span>
-<span class='line-number'>102</span>
-<span class='line-number'>103</span>
-<span class='line-number'>104</span>
-<span class='line-number'>105</span>
-<span class='line-number'>106</span>
-<span class='line-number'>107</span>
-<span class='line-number'>108</span>
-<span class='line-number'>109</span>
-<span class='line-number'>110</span>
-<span class='line-number'>111</span>
-<span class='line-number'>112</span>
-<span class='line-number'>113</span>
-<span class='line-number'>114</span>
-<span class='line-number'>115</span>
-<span class='line-number'>116</span>
-<span class='line-number'>117</span>
-<span class='line-number'>118</span>
-<span class='line-number'>119</span>
-<span class='line-number'>120</span>
-<span class='line-number'>121</span>
-<span class='line-number'>122</span>
-<span class='line-number'>123</span>
-<span class='line-number'>124</span>
-<span class='line-number'>125</span>
-<span class='line-number'>126</span>
-<span class='line-number'>127</span>
-<span class='line-number'>128</span>
-<span class='line-number'>129</span>
-<span class='line-number'>130</span>
-<span class='line-number'>131</span>
-<span class='line-number'>132</span>
-<span class='line-number'>133</span>
-<span class='line-number'>134</span>
-<span class='line-number'>135</span>
-<span class='line-number'>136</span>
-<span class='line-number'>137</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="kt">int</span> <span class="nf">msg_recv_whole_msg</span><span class="p">(</span><span class="k">struct</span> <span class="n">msg_client</span> <span class="o">*</span><span class="n">client</span><span class="p">,</span> <span class="k">struct</span> <span class="n">msg_frag</span> <span class="o">**</span><span class="n">head</span><span class="p">,</span> <span class="kt">int</span> <span class="n">nonblock</span><span class="p">,</span>
-</span><span class='line'>                          <span class="k">struct</span> <span class="n">timespec</span> <span class="o">*</span><span class="n">ts</span><span class="p">)</span>
-</span><span class='line'><span class="p">{</span>
-</span><span class='line'>   <span class="k">struct</span> <span class="n">msg_frag</span> <span class="o">*</span><span class="n">cur_msg</span><span class="p">;</span>
-</span><span class='line'>   <span class="k">struct</span> <span class="n">msg_queue</span> <span class="o">*</span><span class="n">q</span><span class="p">;</span>
-</span><span class='line'>   <span class="k">struct</span> <span class="n">ext_wait_queue</span> <span class="n">wait</span><span class="p">;</span>
-</span><span class='line'>   <span class="k">struct</span> <span class="n">timeval</span> <span class="n">tv</span><span class="p">;</span>
-</span><span class='line'>   <span class="kt">int</span> <span class="n">ret</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-</span><span class='line'>   <span class="kt">long</span> <span class="n">timeout</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-</span><span class='line'>   <span class="n">bool</span> <span class="n">dummy</span><span class="p">,</span> <span class="n">peek_dummy</span><span class="p">,</span> <span class="n">sleep_entry</span><span class="p">;</span>
-</span><span class='line'>   <span class="n">bool</span> <span class="n">first_entry</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
-</span><span class='line'>   <span class="n">buffer_bottom_t</span><span class="o">*</span> <span class="n">bb</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>   <span class="o">*</span><span class="n">head</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">if</span><span class="p">(</span><span class="n">g_enable_timestamps</span><span class="p">)</span>
-</span><span class='line'>     <span class="n">do_gettimeofday</span><span class="p">(</span><span class="o">&amp;</span><span class="n">tv</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>   <span class="n">rcu_read_lock</span><span class="p">();</span> <span class="c1">// make sure q is not freed (in RCU call back)</span>
-</span><span class='line'>   <span class="n">q</span> <span class="o">=</span> <span class="n">client</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">;</span>
-</span><span class='line'>   <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="o">!</span><span class="n">q</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>      <span class="n">rcu_read_unlock</span><span class="p">();</span>
-</span><span class='line'>      <span class="k">return</span> <span class="o">-</span><span class="n">ENOTCONN</span><span class="p">;</span>
-</span><span class='line'>   <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>   <span class="n">prefetch</span><span class="p">(</span><span class="n">q</span><span class="p">);</span>
-</span><span class='line'>   <span class="n">timeout</span> <span class="o">=</span> <span class="n">__prepare_timeout</span><span class="p">(</span><span class="n">ts</span><span class="p">);</span>
-</span><span class='line'>   <span class="k">do</span> <span class="p">{</span>
-</span><span class='line'>      <span class="n">spin_lock_bh</span><span class="p">(</span><span class="o">&amp;</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-</span><span class='line'>      <span class="k">if</span><span class="p">(</span><span class="n">likely</span><span class="p">(</span><span class="n">first_entry</span><span class="p">)){</span>
-</span><span class='line'>         <span class="n">rcu_read_unlock</span><span class="p">();</span> <span class="c1">//we can unlock RCU because spin_lock_bh already disabled preempt</span>
-</span><span class='line'>         <span class="n">first_entry</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
-</span><span class='line'>      <span class="p">}</span>
-</span><span class='line'>      <span class="k">else</span> <span class="p">{</span>
-</span><span class='line'>         <span class="cm">/* Make sure next message is dummy because other threads may fetch it. */</span>
-</span><span class='line'>         <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">__next_msg_is_dummy</span><span class="p">(</span><span class="n">q</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">((</span><span class="o">*</span><span class="n">head</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>            <span class="n">spin_unlock_bh</span><span class="p">(</span><span class="o">&amp;</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-</span><span class='line'>            <span class="k">break</span><span class="p">;</span>
-</span><span class='line'>         <span class="p">}</span>
-</span><span class='line'>      <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>      <span class="k">if</span> <span class="p">(</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_pending_msgs</span><span class="p">)</span> <span class="p">{</span>
-</span><span class='line'>         <span class="n">sleep_entry</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
-</span><span class='line'>         <span class="n">DTRACE</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;msg_recv_whole_msg(): Msg priority queue not empty.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>         <span class="n">cur_msg</span> <span class="o">=</span> <span class="n">__get_first_msg</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="nb">false</span><span class="p">);</span>
-</span><span class='line'>         <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">cur_msg</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>            <span class="n">spin_unlock_bh</span><span class="p">(</span><span class="o">&amp;</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-</span><span class='line'>            <span class="n">EPRINTF</span><span class="p">(</span><span class="s">&quot;Msg Q list empty while counter for msg is %u</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
-</span><span class='line'>               <span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_pending_msgs</span><span class="p">);</span>
-</span><span class='line'>            <span class="k">return</span> <span class="o">-</span><span class="n">ERANGE</span><span class="p">;</span>
-</span><span class='line'>         <span class="p">}</span>
-</span><span class='line'>         <span class="n">dummy</span> <span class="o">=</span> <span class="n">MSG_IS_DUMMY_MSG</span><span class="p">(</span><span class="n">MSGHEADER</span><span class="p">(</span><span class="n">cur_msg</span><span class="p">));</span>
-</span><span class='line'>
-</span><span class='line'>         <span class="n">bb</span> <span class="o">=</span> <span class="p">(</span><span class="n">buffer_bottom_t</span> <span class="o">*</span><span class="p">)(</span><span class="n">cur_msg</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>         <span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_pending_msgs</span><span class="o">--</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'>         <span class="k">if</span> <span class="p">(</span><span class="n">dummy</span><span class="p">)</span> <span class="p">{</span>
-</span><span class='line'>            <span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_pending_dummy_msgs</span><span class="o">--</span><span class="p">;</span>
-</span><span class='line'>         <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>         <span class="k">if</span> <span class="p">(</span><span class="n">need_input_sync</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">cur_msg</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>            <span class="n">client</span><span class="o">-&gt;</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_pending_wosp_msgs</span><span class="o">--</span><span class="p">;</span>
-</span><span class='line'>         <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>         <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">MSG_IS_SYNC_MSG</span><span class="p">(</span><span class="n">bb</span><span class="p">)){</span>
-</span><span class='line'>            <span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_size</span> <span class="o">-=</span> <span class="n">cur_msg</span><span class="o">-&gt;</span><span class="n">n_bufs</span><span class="p">;</span>
-</span><span class='line'>            <span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_msgs</span><span class="o">--</span><span class="p">;</span>
-</span><span class='line'>            <span class="n">msg_pid_queue_stat_dec</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">bb</span><span class="o">-&gt;</span><span class="n">process_id</span><span class="p">,</span> <span class="n">cur_msg</span><span class="o">-&gt;</span><span class="n">n_bufs</span><span class="p">);</span>
-</span><span class='line'>         <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>         <span class="n">recv_input_sync_prepare</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">cur_msg</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>         <span class="c1">// must put behind sync msg send out, for sync msg will use filler2.</span>
-</span><span class='line'>         <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">dummy</span><span class="p">){</span>
-</span><span class='line'>            <span class="n">bb</span><span class="o">-&gt;</span><span class="n">filler2</span> <span class="o">=</span> <span class="p">(</span><span class="n">bb</span><span class="o">-&gt;</span><span class="n">filler2</span> <span class="o">&amp;</span> <span class="mh">0xffff0000</span><span class="p">)</span><span class="o">|</span> <span class="n">get_and_inc_hand_seq</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">bb</span><span class="o">-&gt;</span><span class="n">process_id</span><span class="p">);</span>
-</span><span class='line'>         <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>         <span class="cm">/* Take a peek whether the next message is a dummy message. */</span>
-</span><span class='line'>         <span class="n">peek_dummy</span> <span class="o">=</span> <span class="n">__next_msg_is_dummy</span><span class="p">(</span><span class="n">q</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>         <span class="n">spin_unlock_bh</span><span class="p">(</span><span class="o">&amp;</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-</span><span class='line'>         <span class="n">recv_input_sync</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">cur_msg</span><span class="p">);</span>
-</span><span class='line'>         <span class="n">ret</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-</span><span class='line'>      <span class="p">}</span>
-</span><span class='line'>      <span class="k">else</span> <span class="p">{</span>
-</span><span class='line'>         <span class="n">cur_msg</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>         <span class="n">dummy</span> <span class="o">=</span> <span class="n">peek_dummy</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
-</span><span class='line'>         <span class="n">sleep_entry</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
-</span><span class='line'>         <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">nonblock</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>            <span class="n">DPRINTF</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;msg_recv_whole_msg(): nonblock, don&#39;t sleep</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
-</span><span class='line'>            <span class="n">spin_unlock_bh</span><span class="p">(</span><span class="o">&amp;</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-</span><span class='line'>            <span class="n">ret</span> <span class="o">=</span> <span class="o">-</span><span class="n">EAGAIN</span><span class="p">;</span>
-</span><span class='line'>         <span class="p">}</span>
-</span><span class='line'>         <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">timeout</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>            <span class="n">DPRINTF</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;msg_recv_whole_msg(): timeout &lt; 0: %ld</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">timeout</span><span class="p">);</span>
-</span><span class='line'>            <span class="n">spin_unlock_bh</span><span class="p">(</span><span class="o">&amp;</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-</span><span class='line'>            <span class="n">ret</span> <span class="o">=</span> <span class="o">-</span><span class="n">ETIMEDOUT</span><span class="p">;</span>
-</span><span class='line'>         <span class="p">}</span>
-</span><span class='line'>         <span class="k">else</span> <span class="p">{</span>
-</span><span class='line'>            <span class="n">wait</span><span class="p">.</span><span class="n">task</span> <span class="o">=</span> <span class="n">current</span><span class="p">;</span>
-</span><span class='line'>            <span class="n">wait</span><span class="p">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">STATE_NONE</span><span class="p">;</span>
-</span><span class='line'>            <span class="n">DPRINTF</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;msg_recv_whole_msg(): going to sleep.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
-</span><span class='line'>            <span class="n">ret</span> <span class="o">=</span> <span class="n">__wq_sleep</span><span class="p">(</span><span class="o">&amp;</span><span class="n">client</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">timeout</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">wait</span><span class="p">);</span>
-</span><span class='line'>            <span class="k">if</span> <span class="p">(</span><span class="n">ret</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
-</span><span class='line'>               <span class="n">cur_msg</span> <span class="o">=</span> <span class="n">wait</span><span class="p">.</span><span class="n">head</span><span class="p">;</span>
-</span><span class='line'>               <span class="n">recv_input_sync</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">cur_msg</span><span class="p">);</span>
-</span><span class='line'>               <span class="k">if</span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">MSG_IS_DUMMY_MSG</span><span class="p">(</span><span class="n">MSGHEADER</span><span class="p">(</span><span class="n">cur_msg</span><span class="p">)))){</span>
-</span><span class='line'>                  <span class="n">WPRINTF</span><span class="p">(</span><span class="s">&quot;Unexpected dummy message received in wait task. From %x.%x.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
-</span><span class='line'>                     <span class="n">MSGHEADER</span><span class="p">(</span><span class="n">cur_msg</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">computer</span><span class="p">,</span><span class="n">MSGHEADER</span><span class="p">(</span><span class="n">cur_msg</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">family</span><span class="p">);</span>
-</span><span class='line'>                  <span class="n">dummy</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
-</span><span class='line'>               <span class="p">}</span>
-</span><span class='line'>            <span class="p">}</span>
-</span><span class='line'>         <span class="p">}</span>
-</span><span class='line'>      <span class="p">}</span>
-</span><span class='line'>      <span class="n">DTRACE</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;msg_recv_whole_msg() ret: %d, msg:(%p)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">ret</span><span class="p">,</span> <span class="n">cur_msg</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>      <span class="k">if</span> <span class="p">(</span><span class="n">dummy</span><span class="p">)</span>
-</span><span class='line'>         <span class="n">msg_free_msg</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cur_msg</span><span class="p">);</span>
-</span><span class='line'>      <span class="k">else</span> <span class="k">if</span> <span class="p">((</span><span class="o">*</span><span class="n">head</span><span class="p">)</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="c1">//Store the non-dummy message to receiver</span>
-</span><span class='line'>         <span class="o">*</span><span class="n">head</span> <span class="o">=</span> <span class="n">cur_msg</span><span class="p">;</span>
-</span><span class='line'>   <span class="p">}</span> <span class="k">while</span> <span class="p">(((</span><span class="o">*</span><span class="n">head</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="o">!</span><span class="n">sleep_entry</span><span class="p">)</span> <span class="o">||</span> <span class="p">(</span><span class="n">dummy</span> <span class="o">&amp;&amp;</span> <span class="n">sleep_entry</span><span class="p">)</span> <span class="o">||</span> <span class="n">unlikely</span><span class="p">(</span><span class="n">peek_dummy</span><span class="p">));</span>
-</span><span class='line'>
-</span><span class='line'>   <span class="cm">/* restore bb-&gt;phys_computer because all input-sync related logic is completed here</span>
-</span><span class='line'><span class="cm">    restore it so that monitor tools sees compliant data as cIPA */</span>
-</span><span class='line'>   <span class="k">if</span> <span class="p">(</span><span class="o">*</span><span class="n">head</span><span class="p">)</span> <span class="p">{</span>
-</span><span class='line'>      <span class="n">bb</span> <span class="o">=</span> <span class="p">(</span><span class="n">buffer_bottom_t</span> <span class="o">*</span><span class="p">)(</span><span class="o">*</span><span class="n">head</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">;</span>
-</span><span class='line'>      <span class="n">bb</span><span class="o">-&gt;</span><span class="n">phys_computer</span> <span class="o">=</span> <span class="n">bb</span><span class="o">-&gt;</span><span class="n">next_phys_computer</span><span class="p">;</span>
-</span><span class='line'>      <span class="k">if</span><span class="p">(</span><span class="n">g_enable_timestamps</span><span class="p">){</span>
-</span><span class='line'>         <span class="n">set_time_rec</span><span class="p">(</span><span class="o">*</span><span class="n">head</span><span class="p">,</span> <span class="n">TIMEREC_ENTER_IOCTL</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">tv</span><span class="p">);</span>
-</span><span class='line'>      <span class="p">}</span>
-</span><span class='line'>   <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>   <span class="n">__msg_monitor</span><span class="p">(</span><span class="o">*</span><span class="n">head</span><span class="p">,</span> <span class="n">MON_POINTS_T_RECEIVE_C</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>   <span class="k">return</span> <span class="n">ret</span><span class="p">;</span>
-</span><span class='line'><span class="p">}</span>
-</span></code></pre></td></tr></table></div></figure></notextile></div></p>
-
-<h3>重构后的代码</h3>
-
-<p><div class='bogus-wrapper'><notextile><figure class='code'><figcaption><span>[重构后的代码]  (recv_whole_msg_r2.c)</span> <a href='/downloads/code/a-piece-of-code-refactoring/recv_whole_msg_r2.c'>download</a></figcaption>
-<div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-<span class='line-number'>54</span>
-<span class='line-number'>55</span>
-<span class='line-number'>56</span>
-<span class='line-number'>57</span>
-<span class='line-number'>58</span>
-<span class='line-number'>59</span>
-<span class='line-number'>60</span>
-<span class='line-number'>61</span>
-<span class='line-number'>62</span>
-<span class='line-number'>63</span>
-<span class='line-number'>64</span>
-<span class='line-number'>65</span>
-<span class='line-number'>66</span>
-<span class='line-number'>67</span>
-<span class='line-number'>68</span>
-<span class='line-number'>69</span>
-<span class='line-number'>70</span>
-<span class='line-number'>71</span>
-<span class='line-number'>72</span>
-<span class='line-number'>73</span>
-<span class='line-number'>74</span>
-<span class='line-number'>75</span>
-<span class='line-number'>76</span>
-<span class='line-number'>77</span>
-<span class='line-number'>78</span>
-<span class='line-number'>79</span>
-<span class='line-number'>80</span>
-<span class='line-number'>81</span>
-<span class='line-number'>82</span>
-<span class='line-number'>83</span>
-<span class='line-number'>84</span>
-<span class='line-number'>85</span>
-<span class='line-number'>86</span>
-<span class='line-number'>87</span>
-<span class='line-number'>88</span>
-<span class='line-number'>89</span>
-<span class='line-number'>90</span>
-<span class='line-number'>91</span>
-<span class='line-number'>92</span>
-<span class='line-number'>93</span>
-<span class='line-number'>94</span>
-<span class='line-number'>95</span>
-<span class='line-number'>96</span>
-<span class='line-number'>97</span>
-<span class='line-number'>98</span>
-<span class='line-number'>99</span>
-<span class='line-number'>100</span>
-<span class='line-number'>101</span>
-<span class='line-number'>102</span>
-<span class='line-number'>103</span>
-<span class='line-number'>104</span>
-<span class='line-number'>105</span>
-<span class='line-number'>106</span>
-<span class='line-number'>107</span>
-<span class='line-number'>108</span>
-<span class='line-number'>109</span>
-<span class='line-number'>110</span>
-<span class='line-number'>111</span>
-<span class='line-number'>112</span>
-<span class='line-number'>113</span>
-<span class='line-number'>114</span>
-<span class='line-number'>115</span>
-<span class='line-number'>116</span>
-<span class='line-number'>117</span>
-<span class='line-number'>118</span>
-<span class='line-number'>119</span>
-<span class='line-number'>120</span>
-<span class='line-number'>121</span>
-<span class='line-number'>122</span>
-<span class='line-number'>123</span>
-<span class='line-number'>124</span>
-<span class='line-number'>125</span>
-<span class='line-number'>126</span>
-<span class='line-number'>127</span>
-<span class='line-number'>128</span>
-<span class='line-number'>129</span>
-<span class='line-number'>130</span>
-<span class='line-number'>131</span>
-<span class='line-number'>132</span>
-<span class='line-number'>133</span>
-<span class='line-number'>134</span>
-<span class='line-number'>135</span>
-<span class='line-number'>136</span>
-<span class='line-number'>137</span>
-<span class='line-number'>138</span>
-<span class='line-number'>139</span>
-<span class='line-number'>140</span>
-<span class='line-number'>141</span>
-<span class='line-number'>142</span>
-<span class='line-number'>143</span>
-<span class='line-number'>144</span>
-<span class='line-number'>145</span>
-<span class='line-number'>146</span>
-<span class='line-number'>147</span>
-<span class='line-number'>148</span>
-<span class='line-number'>149</span>
-<span class='line-number'>150</span>
-<span class='line-number'>151</span>
-<span class='line-number'>152</span>
-<span class='line-number'>153</span>
-<span class='line-number'>154</span>
-<span class='line-number'>155</span>
-<span class='line-number'>156</span>
-<span class='line-number'>157</span>
-<span class='line-number'>158</span>
-<span class='line-number'>159</span>
-<span class='line-number'>160</span>
-<span class='line-number'>161</span>
-<span class='line-number'>162</span>
-<span class='line-number'>163</span>
-<span class='line-number'>164</span>
-<span class='line-number'>165</span>
-<span class='line-number'>166</span>
-<span class='line-number'>167</span>
-<span class='line-number'>168</span>
-<span class='line-number'>169</span>
-<span class='line-number'>170</span>
-<span class='line-number'>171</span>
-<span class='line-number'>172</span>
-<span class='line-number'>173</span>
-<span class='line-number'>174</span>
-<span class='line-number'>175</span>
-<span class='line-number'>176</span>
-<span class='line-number'>177</span>
-<span class='line-number'>178</span>
-<span class='line-number'>179</span>
-<span class='line-number'>180</span>
-<span class='line-number'>181</span>
-<span class='line-number'>182</span>
-<span class='line-number'>183</span>
-<span class='line-number'>184</span>
-<span class='line-number'>185</span>
-<span class='line-number'>186</span>
-<span class='line-number'>187</span>
-<span class='line-number'>188</span>
-<span class='line-number'>189</span>
-<span class='line-number'>190</span>
-<span class='line-number'>191</span>
-<span class='line-number'>192</span>
-<span class='line-number'>193</span>
-<span class='line-number'>194</span>
-<span class='line-number'>195</span>
-<span class='line-number'>196</span>
-<span class='line-number'>197</span>
-<span class='line-number'>198</span>
-<span class='line-number'>199</span>
-<span class='line-number'>200</span>
-<span class='line-number'>201</span>
-<span class='line-number'>202</span>
-<span class='line-number'>203</span>
-<span class='line-number'>204</span>
-<span class='line-number'>205</span>
-<span class='line-number'>206</span>
-<span class='line-number'>207</span>
-<span class='line-number'>208</span>
-<span class='line-number'>209</span>
-<span class='line-number'>210</span>
-<span class='line-number'>211</span>
-<span class='line-number'>212</span>
-<span class='line-number'>213</span>
-<span class='line-number'>214</span>
-<span class='line-number'>215</span>
-<span class='line-number'>216</span>
-<span class='line-number'>217</span>
-<span class='line-number'>218</span>
-<span class='line-number'>219</span>
-<span class='line-number'>220</span>
-<span class='line-number'>221</span>
-<span class='line-number'>222</span>
-<span class='line-number'>223</span>
-<span class='line-number'>224</span>
-<span class='line-number'>225</span>
-<span class='line-number'>226</span>
-<span class='line-number'>227</span>
-<span class='line-number'>228</span>
-<span class='line-number'>229</span>
-<span class='line-number'>230</span>
-<span class='line-number'>231</span>
-<span class='line-number'>232</span>
-<span class='line-number'>233</span>
-<span class='line-number'>234</span>
-<span class='line-number'>235</span>
-<span class='line-number'>236</span>
-<span class='line-number'>237</span>
-</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="cm">/**</span>
-</span><span class='line'><span class="cm"> * Aquire the q&#39;s lock need RCU read lock proctect because the q can be release</span>
-</span><span class='line'><span class="cm"> *   in the mid without that proctect. After the q&#39;s lock is got, rcu read lock</span>
-</span><span class='line'><span class="cm"> *   is released because q cannot be released anymore</span>
-</span><span class='line'><span class="cm"> *</span>
-</span><span class='line'><span class="cm"> * return NULL: failure</span>
-</span><span class='line'><span class="cm"> * Otherwise: pointer to q is returned and q is locked</span>
-</span><span class='line'><span class="cm"> */</span>
-</span><span class='line'><span class="n">STATIC</span> <span class="n">INLINE</span> <span class="k">struct</span> <span class="n">msg_queue</span> <span class="o">*</span><span class="nf">client_q_lock_protect</span><span class="p">(</span><span class="k">struct</span> <span class="n">msg_client</span> <span class="o">*</span><span class="n">client</span><span class="p">)</span> <span class="p">{</span>
-</span><span class='line'>  <span class="k">struct</span> <span class="n">msg_queue</span> <span class="o">*</span><span class="n">q</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="n">rcu_read_lock</span><span class="p">();</span>
-</span><span class='line'>  <span class="n">q</span> <span class="o">=</span> <span class="n">client</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="o">!</span><span class="n">q</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>    <span class="n">rcu_read_unlock</span><span class="p">();</span>
-</span><span class='line'>    <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>  <span class="n">spin_lock_bh</span><span class="p">(</span><span class="o">&amp;</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-</span><span class='line'>  <span class="n">rcu_read_unlock</span><span class="p">();</span>
-</span><span class='line'>  <span class="k">return</span> <span class="n">q</span><span class="p">;</span>
-</span><span class='line'><span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'><span class="cp">#define client_q_unlock(q) spin_unlock_bh(&amp;q-&gt;lock)</span>
-</span><span class='line'>
-</span><span class='line'>
-</span><span class='line'><span class="cm">/**</span>
-</span><span class='line'><span class="cm"> * Get message from pending queue.</span>
-</span><span class='line'><span class="cm"> *</span>
-</span><span class='line'><span class="cm"> * Caller should hold the q&#39;s lock and the q shouldn&#39;t be empty</span>
-</span><span class='line'><span class="cm"> * </span>
-</span><span class='line'><span class="cm"> * The q&#39;s lock will be freed in this function when it returns</span>
-</span><span class='line'><span class="cm"> * </span>
-</span><span class='line'><span class="cm"> * Return: 0 is successful otherwise failure</span>
-</span><span class='line'><span class="cm"> * Output: In case of success, *head helds the pointer of the received msg</span>
-</span><span class='line'><span class="cm"> */</span>
-</span><span class='line'><span class="n">STATIC</span> <span class="n">INLINE</span> <span class="kt">int</span> <span class="nf">__get_a_msg_from_q</span><span class="p">(</span><span class="k">struct</span> <span class="n">msg_client</span> <span class="o">*</span><span class="n">client</span><span class="p">,</span> <span class="k">struct</span> <span class="n">msg_frag</span> <span class="o">**</span><span class="n">head</span><span class="p">)</span>
-</span><span class='line'><span class="p">{</span>
-</span><span class='line'>  <span class="n">bool</span> <span class="n">dummy</span><span class="p">;</span>
-</span><span class='line'>  <span class="n">buffer_bottom_t</span>     <span class="o">*</span> <span class="n">bb</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">struct</span> <span class="n">msg_queue</span> <span class="o">*</span> <span class="n">q</span> <span class="o">=</span> <span class="n">client</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">struct</span> <span class="n">msg_frag</span> <span class="o">*</span><span class="n">cur_msg</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="n">cur_msg</span> <span class="o">=</span> <span class="n">__get_first_msg</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="nb">false</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="o">!</span><span class="n">cur_msg</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>    <span class="n">EPRINTF</span><span class="p">(</span><span class="s">&quot;Msg Q list empty while counter for msg is %u</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_pending_msgs</span><span class="p">);</span>
-</span><span class='line'>    <span class="n">client_q_unlock</span><span class="p">(</span><span class="n">q</span><span class="p">);</span>
-</span><span class='line'>    <span class="k">return</span> <span class="o">-</span><span class="n">ERANGE</span><span class="p">;</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_pending_msgs</span><span class="o">--</span><span class="p">;</span>
-</span><span class='line'>  <span class="n">dummy</span> <span class="o">=</span> <span class="n">MSG_IS_DUMMY_MSG</span><span class="p">(</span><span class="n">MSGHEADER</span><span class="p">(</span><span class="n">cur_msg</span><span class="p">));</span>
-</span><span class='line'>  <span class="k">if</span> <span class="p">(</span><span class="n">dummy</span><span class="p">)</span> <span class="p">{</span>
-</span><span class='line'>    <span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_pending_dummy_msgs</span><span class="o">--</span><span class="p">;</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">if</span> <span class="p">(</span><span class="n">need_input_sync</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">cur_msg</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>    <span class="n">client</span><span class="o">-&gt;</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_pending_wosp_msgs</span><span class="o">--</span><span class="p">;</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="n">bb</span> <span class="o">=</span> <span class="p">(</span><span class="n">buffer_bottom_t</span> <span class="o">*</span><span class="p">)(</span><span class="n">cur_msg</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">MSG_IS_SYNC_MSG</span><span class="p">(</span><span class="n">bb</span><span class="p">)){</span>
-</span><span class='line'>    <span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_size</span> <span class="o">-=</span> <span class="n">cur_msg</span><span class="o">-&gt;</span><span class="n">n_bufs</span><span class="p">;</span>
-</span><span class='line'>    <span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_msgs</span><span class="o">--</span><span class="p">;</span>
-</span><span class='line'>    <span class="n">msg_pid_queue_stat_dec</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">bb</span><span class="o">-&gt;</span><span class="n">process_id</span><span class="p">,</span> <span class="n">cur_msg</span><span class="o">-&gt;</span><span class="n">n_bufs</span><span class="p">);</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="n">recv_input_sync_prepare</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">cur_msg</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1">// must put behind sync msg send out, for sync msg will use filler2.</span>
-</span><span class='line'>  <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">dummy</span><span class="p">){</span>
-</span><span class='line'>    <span class="n">bb</span><span class="o">-&gt;</span><span class="n">filler2</span> <span class="o">=</span> <span class="p">(</span><span class="n">bb</span><span class="o">-&gt;</span><span class="n">filler2</span> <span class="o">&amp;</span> <span class="mh">0xffff0000</span><span class="p">)</span><span class="o">|</span> <span class="n">get_and_inc_hand_seq</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">bb</span><span class="o">-&gt;</span><span class="n">process_id</span><span class="p">);</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="n">client_q_unlock</span><span class="p">(</span><span class="n">q</span><span class="p">);</span>
-</span><span class='line'>  <span class="o">*</span><span class="n">head</span> <span class="o">=</span> <span class="n">cur_msg</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
-</span><span class='line'><span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>
-</span><span class='line'><span class="cm">/**</span>
-</span><span class='line'><span class="cm"> * Waiting for new message, it will sleep while no message is arrival.</span>
-</span><span class='line'><span class="cm"> * Caller should hold the q&#39;s lock</span>
-</span><span class='line'><span class="cm"> * The __wq_sleep will free the q&#39;s lock when it returns from.</span>
-</span><span class='line'><span class="cm"> */</span>
-</span><span class='line'><span class="n">STATIC</span> <span class="n">INLINE</span> <span class="kt">int</span> <span class="nf">__waiting_for_new_msg</span><span class="p">(</span><span class="k">struct</span> <span class="n">msg_queue</span> <span class="o">*</span><span class="n">q</span><span class="p">,</span> <span class="kt">int</span> <span class="n">nonblock</span><span class="p">,</span>
-</span><span class='line'>			    <span class="k">struct</span> <span class="n">timespec</span> <span class="o">*</span><span class="n">ts</span><span class="p">,</span> <span class="k">struct</span> <span class="n">msg_frag</span> <span class="o">**</span><span class="n">head</span><span class="p">)</span>
-</span><span class='line'><span class="p">{</span>
-</span><span class='line'>  <span class="kt">int</span>    <span class="n">ret</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-</span><span class='line'>  <span class="kt">long</span>   <span class="n">timeout</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">struct</span> <span class="n">ext_wait_queue</span> <span class="n">wait</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="o">*</span><span class="n">head</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>  <span class="n">timeout</span> <span class="o">=</span> <span class="n">__prepare_timeout</span><span class="p">(</span><span class="n">ts</span><span class="p">);</span>
-</span><span class='line'>  <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">nonblock</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>    <span class="n">DPRINTF</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;%s(): nonblock, don&#39;t sleep</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">__func__</span><span class="p">);</span>
-</span><span class='line'>    <span class="n">spin_unlock_bh</span><span class="p">(</span><span class="o">&amp;</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-</span><span class='line'>    <span class="n">ret</span> <span class="o">=</span> <span class="o">-</span><span class="n">EAGAIN</span><span class="p">;</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>  <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">timeout</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>    <span class="n">DPRINTF</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;%s(): timeout &lt; 0: %ld</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">__func__</span><span class="p">,</span> <span class="n">timeout</span><span class="p">);</span>
-</span><span class='line'>    <span class="n">spin_unlock_bh</span><span class="p">(</span><span class="o">&amp;</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-</span><span class='line'>    <span class="n">ret</span> <span class="o">=</span> <span class="o">-</span><span class="n">ETIMEDOUT</span><span class="p">;</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>  <span class="k">else</span> <span class="p">{</span>
-</span><span class='line'>    <span class="n">wait</span><span class="p">.</span><span class="n">task</span> <span class="o">=</span> <span class="n">current</span><span class="p">;</span>
-</span><span class='line'>    <span class="n">wait</span><span class="p">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">STATE_NONE</span><span class="p">;</span>
-</span><span class='line'>    <span class="n">DPRINTF</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;%s(): going to sleep.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">__func__</span><span class="p">);</span>
-</span><span class='line'>    <span class="n">ret</span> <span class="o">=</span> <span class="n">__wq_sleep</span><span class="p">(</span><span class="o">&amp;</span><span class="n">q</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">timeout</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">wait</span><span class="p">);</span>
-</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">ret</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
-</span><span class='line'>      <span class="o">*</span><span class="n">head</span> <span class="o">=</span> <span class="n">wait</span><span class="p">.</span><span class="n">head</span><span class="p">;</span>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">return</span> <span class="n">ret</span><span class="p">;</span>
-</span><span class='line'><span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>
-</span><span class='line'><span class="cm">/**</span>
-</span><span class='line'><span class="cm"> * return 0 until it received a non dummy message, the recevied msg is saved</span>
-</span><span class='line'><span class="cm"> *   in the parameter cur_msg. If it received a dummy message, it handles </span>
-</span><span class='line'><span class="cm"> *   this dummy message and back to receive next message again </span>
-</span><span class='line'><span class="cm"> * </span>
-</span><span class='line'><span class="cm"> * return non-zero if there are errors</span>
-</span><span class='line'><span class="cm"> */</span>
-</span><span class='line'><span class="n">STATIC</span> <span class="n">INLINE</span> <span class="kt">int</span> <span class="nf">msg_recv_a_nondummy_msg</span><span class="p">(</span><span class="k">struct</span> <span class="n">msg_client</span> <span class="o">*</span><span class="n">client</span><span class="p">,</span>
-</span><span class='line'>			       <span class="k">struct</span> <span class="n">msg_frag</span> <span class="o">*</span> <span class="n">cur_msg</span><span class="p">,</span> <span class="kt">int</span> <span class="n">nonblock</span><span class="p">,</span>
-</span><span class='line'>			       <span class="k">struct</span> <span class="n">timespec</span> <span class="o">*</span><span class="n">ts</span><span class="p">)</span>
-</span><span class='line'><span class="p">{</span>
-</span><span class='line'>  <span class="n">bool</span> <span class="n">dummy</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span> <span class="c1">// the received msg is a dummy message</span>
-</span><span class='line'>  <span class="kt">int</span>  <span class="n">ret</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">struct</span> <span class="n">msg_queue</span> <span class="o">*</span> <span class="n">q</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="n">cur_msg</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">do</span> <span class="p">{</span>  <span class="cm">/* Get first un-dummy messages. */</span>
-</span><span class='line'>    <span class="n">q</span> <span class="o">=</span> <span class="n">client_q_lock_protect</span><span class="p">(</span><span class="n">client</span><span class="p">);</span>
-</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="o">!</span><span class="n">q</span><span class="p">)){</span>
-</span><span class='line'>      <span class="k">return</span> <span class="o">-</span><span class="n">ENOTCONN</span><span class="p">;</span>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">q</span><span class="o">-&gt;</span><span class="n">msg_queue_pending_msgs</span><span class="p">)</span> <span class="p">{</span>
-</span><span class='line'>      <span class="n">DTRACE</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;%s(): Msg priority queue NOT empty.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">__func__</span><span class="p">);</span>
-</span><span class='line'>      <span class="n">ret</span> <span class="o">=</span> <span class="n">__get_a_msg_from_q</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">cur_msg</span><span class="p">);</span>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>    <span class="k">else</span> <span class="p">{</span>
-</span><span class='line'>      <span class="n">DTRACE</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s">&quot;%s(): Msg priority queue empty.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">__func__</span><span class="p">);</span>
-</span><span class='line'>      <span class="n">ret</span> <span class="o">=</span> <span class="n">__waiting_for_new_msg</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">nonblock</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">cur_msg</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">ret</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>      <span class="k">return</span> <span class="n">ret</span><span class="p">;</span>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="n">recv_input_sync</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">cur_msg</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="n">dummy</span> <span class="o">=</span> <span class="n">MSG_IS_DUMMY_MSG</span><span class="p">(</span><span class="n">MSGHEADER</span><span class="p">(</span><span class="n">cur_msg</span><span class="p">));</span>
-</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">dummy</span><span class="p">)</span> <span class="p">{</span>
-</span><span class='line'>      <span class="n">msg_free_msg</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cur_msg</span><span class="p">);</span>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>  <span class="p">}</span> <span class="k">while</span> <span class="p">(</span><span class="n">dummy</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1">// a non dummy message is received, return OK</span>
-</span><span class='line'>  <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
-</span><span class='line'><span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>
-</span><span class='line'><span class="cm">/**</span>
-</span><span class='line'><span class="cm"> * exhaust all dummy messages in the queue until the queue is empty or the head</span>
-</span><span class='line'><span class="cm"> * message isn&#39;t a dummy message.</span>
-</span><span class='line'><span class="cm"> *</span>
-</span><span class='line'><span class="cm"> * Up to now, no need to know whether this function succeeds or not. Therefore,</span>
-</span><span class='line'><span class="cm"> * no error code is returned even if there are errors</span>
-</span><span class='line'><span class="cm"> */</span>
-</span><span class='line'><span class="n">STATIC</span> <span class="n">INLINE</span> <span class="kt">void</span> <span class="nf">exhaust_dummy_msgs_from_queue</span><span class="p">(</span><span class="k">struct</span> <span class="n">msg_client</span> <span class="o">*</span><span class="n">client</span><span class="p">)</span>
-</span><span class='line'><span class="p">{</span>
-</span><span class='line'>  <span class="k">struct</span> <span class="n">msg_queue</span> <span class="o">*</span> <span class="n">q</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">struct</span> <span class="n">msg_frag</span> <span class="o">*</span> <span class="n">cur_msg</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">for</span><span class="p">(;;)</span> <span class="p">{</span>
-</span><span class='line'>    <span class="n">q</span> <span class="o">=</span> <span class="n">client_q_lock_protect</span><span class="p">(</span><span class="n">client</span><span class="p">);</span>
-</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="o">!</span><span class="n">q</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>      <span class="k">break</span><span class="p">;</span>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">__next_msg_is_dummy</span><span class="p">(</span><span class="n">q</span><span class="p">))</span> <span class="p">{</span>
-</span><span class='line'>      <span class="n">client_q_unlock</span><span class="p">(</span><span class="n">q</span><span class="p">);</span>
-</span><span class='line'>      <span class="k">break</span><span class="p">;</span>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span> <span class="n">__get_a_msg_from_q</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">cur_msg</span><span class="p">)))</span> <span class="p">{</span>
-</span><span class='line'>      <span class="k">break</span><span class="p">;</span>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="n">msg_free_msg</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cur_msg</span><span class="p">);</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'><span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'><span class="cm">/*</span>
-</span><span class='line'><span class="cm"> *</span>
-</span><span class='line'><span class="cm"> */</span>
-</span><span class='line'><span class="kt">int</span> <span class="nf">msg_recv_whole_msg</span><span class="p">(</span><span class="k">struct</span> <span class="n">msg_client</span> <span class="o">*</span><span class="n">client</span><span class="p">,</span> <span class="k">struct</span> <span class="n">msg_frag</span> <span class="o">**</span><span class="n">head</span><span class="p">,</span>
-</span><span class='line'>			  <span class="kt">int</span> <span class="n">nonblock</span><span class="p">,</span> <span class="k">struct</span> <span class="n">timespec</span> <span class="o">*</span><span class="n">ts</span><span class="p">)</span>
-</span><span class='line'><span class="p">{</span>
-</span><span class='line'>  <span class="kt">int</span>  <span class="n">ret</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">struct</span> <span class="n">timeval</span> <span class="n">tv</span><span class="p">;</span>
-</span><span class='line'>  <span class="n">buffer_bottom_t</span> <span class="o">*</span> <span class="n">bb</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>  <span class="k">struct</span> <span class="n">msg_frag</span> <span class="o">*</span> <span class="n">cur_msg</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="o">*</span><span class="n">head</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">if</span><span class="p">(</span><span class="n">g_enable_timestamps</span><span class="p">)</span>
-</span><span class='line'>    <span class="n">do_gettimeofday</span><span class="p">(</span><span class="o">&amp;</span><span class="n">tv</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="n">ret</span> <span class="o">=</span> <span class="n">msg_recv_a_nondummy_msg</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">cur_msg</span><span class="p">,</span> <span class="n">nonblock</span><span class="p">,</span> <span class="n">ts</span><span class="p">);</span>
-</span><span class='line'>  <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="o">!</span><span class="n">ret</span><span class="p">)){</span>
-</span><span class='line'>    <span class="k">return</span> <span class="n">ret</span><span class="p">;</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="cm">/* restore bb-&gt;phys_computer because all input-sync related logic is completed here</span>
-</span><span class='line'><span class="cm">   * restore it so that monitor tools sees compliant data as cIPA */</span>
-</span><span class='line'>  <span class="o">*</span><span class="n">head</span> <span class="o">=</span> <span class="n">cur_msg</span><span class="p">;</span>
-</span><span class='line'>  <span class="n">cur_msg</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
-</span><span class='line'>  <span class="n">bb</span> <span class="o">=</span> <span class="p">(</span><span class="n">buffer_bottom_t</span> <span class="o">*</span><span class="p">)(</span><span class="o">*</span><span class="n">head</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">;</span>
-</span><span class='line'>  <span class="n">bb</span><span class="o">-&gt;</span><span class="n">phys_computer</span> <span class="o">=</span> <span class="n">bb</span><span class="o">-&gt;</span><span class="n">next_phys_computer</span><span class="p">;</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">if</span><span class="p">(</span><span class="n">g_enable_timestamps</span><span class="p">){</span>
-</span><span class='line'>    <span class="n">set_time_rec</span><span class="p">(</span><span class="o">*</span><span class="n">head</span><span class="p">,</span> <span class="n">TIMEREC_ENTER_IOCTL</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">tv</span><span class="p">);</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="cm">/* exhaust dummy msgs before give the received msg to user </span>
-</span><span class='line'><span class="cm">   * for better latency of relative messages</span>
-</span><span class='line'><span class="cm">   */</span>
-</span><span class='line'>  <span class="n">exhaust_dummy_msgs_from_queue</span><span class="p">(</span><span class="n">client</span><span class="p">);</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">return</span> <span class="n">ret</span><span class="p">;</span>
-</span><span class='line'><span class="p">}</span>
-</span></code></pre></td></tr></table></div></figure></notextile></div></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[双向链表在Linux Kernel中的实现]]></title>
-    <link href="http://jeff66ruan.github.io/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/"/>
-    <updated>2014-02-27T05:41:58+08:00</updated>
-    <id>http://jeff66ruan.github.io/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel</id>
-    <content type="html"><![CDATA[<p>双向链表是一个简单的数据结构,使用非常广泛，应该人人知道，会用，打开编辑器马上可以写一个。但是Linux的双向链表实现非常巧妙，它使用了一个小小的编程技巧，使得开发人员定义自己的数据结构时添加一个struct list_head字段（list_head是Linux Kernel定义的双向链表的数据结构），就可以使自己的数据结构具备双向链表功能，采用Linux Kernel提供的操作函数，使得使用双向链表非常简单。如果我们在v3.9-rc8中grep list_head，竟然有多达11400多条匹配，可见双向链表在Linux kernel中的江湖地位，实际上，我们在读Linux源码时，到处可以见到以list_head组织起来的数据结构。</p>
-
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/lines-of-list-head.png"></p>
-
-<p>下面我们将详细看看list_head结构及其相关函数，并且用一个简单例子学习如何使用它们。</p>
-
-<h4>list_head结构</h4>
-
-<p>数据结构是代码的核心，我们先来看看双向链表的数据结构。linux kernel在&lt;linux/list.h>中定义了双向链表的数据结构struct list_head。list_head定义很简单，只有两个成员函数next和prev，用于指向list_head：</p>
-
-<p>``` c struct list_head的定义
-struct list_head {</p>
-
-<pre><code>   struct list_head *next, *prev;
-</code></pre>
-
-<p>};
+<p>$ cat /proc/cpuinfo |grep &ldquo;model name&rdquo;
+model name      : Intel&reg; Core&trade;2 Duo CPU     P8600  @ 2.40GHz
+model name      : Intel&reg; Core&trade;2 Duo CPU     P8600  @ 2.40GHz
 ```</p>
 
-<h4>函数列表</h4>
+<h3>Source Code</h3>
 
-<p>在list_head定义的基础上，Linux kernel提供了丰富的链表操作函数，下表列出了其中一些主要的。所有双向链表的操作都应该使用操作函数，而不应该直接访问list_head内部的next和prev指针，这样当list_head的实现改变时，使用的代码可以不受到影响。</p>
+<p>There are two pieces of programs, which are &ldquo;no_alignment&rdquo; and &ldquo;alignment&rdquo;. They are compiled with GNU GCC. Each program clones a child sharing the same memory address space, which means the parent and the child updating different fileds of the same global data. The difference is that the program &ldquo;alignment&rdquo; optimizing the fields of the shared_data to the cache line size alignment. In this way, the two fields are able to be fetched on different cache lines. Therefore, when the parent and the child runs on different cores, the &ldquo;no_alignment&rdquo; program has the cache invlidation costs between two cores, but the &ldquo;alignment&rdquo; program doesn&rsquo;t.</p>
 
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/list-operations.png"></p>
+<p>The following are the source codes of the two programs. The only difference is the definition of struct shared_data.</p>
 
-<h4>使用</h4>
+<p>``` c no_alignment</p>
 
-<p>Linux kernel的双向列表实现巧妙，只要在我们的数据结构中定义一个struct list_head的字段就可以使我们的数据结构具备双向链表的功能。通过链表提供的操作函数，我们可以创建自己的双向链表。一个创建好的链表为下图所示的组织形式：</p>
+<h1>define _GNU_SOURCE</h1>
 
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/list-head-general.png"></p>
+<h1>include &lt;sched.h></h1>
 
-<p>我们可以通过一个例子来具体的理解和体会这个结构的方便简单的使用方式。</p>
+<h1>include &lt;stdio.h></h1>
 
-<h4>例子</h4>
+<h1>include &lt;errno.h></h1>
 
-<h5>定义自己的数据结构</h5>
+<h1>include &lt;stdlib.h></h1>
 
-<p>定义我们的struct my_struct_t结构：</p>
+<p>// shared data
+struct shared_data {
+  unsigned int num_proc1;
+  unsigned int num_proc2;
+};</p>
 
-<p><code>c 定义my_struct_t
-typedef struct my_struct {
-  int id;
-  struct list_head lists;
-  char *name;
-} my_struct_t;
-</code></p>
+<p>struct shared_data shared;</p>
 
-<p>struct list_head可以在数据结构中任意位置。上面代码中，我们定义了一个my_struct_t的结构，有三个字段id, lists和name。其中lists申明为struct list_head.</p>
+<p>// define loops to run for a while
+int loop_i = 100000, loop_j = 100000;</p>
 
-<h5>定义链表头</h5>
+<p>int child(void *);</p>
 
-<p><code>c 定义链表头my_struct_list
-LIST_HEAD(my_struct_list);
-</code></p>
+<h1>define STACK_SIZE (8 * 1024)</h1>
 
-<p>LIST_HEAD是一个宏，它实际上声明了一个struct list_head变量my_struct_list，并且初始化字段next和prev指向自身。初始化完成之后，my_struct_list实际为如下图所示：</p>
+<p>int main(void)
+{
+  pid_t pid;
+  int i, j;</p>
 
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/list-head-zero.png"></p>
+<p>  /<em> Stack </em>/
+  char <em>stack = (char </em>)malloc(STACK_SIZE);
+  if (!stack) {</p>
 
-<h5>插入一个链表项</h5>
-
-<p>我们可以用list_add(new, head)向在链表头部插入一个链表项。</p>
-
-<p>``` c 插入my_struct2到链表
-my_struct_t my_struct2 = {.id = 2,</p>
-
-<pre><code>                      .name = "struct2"};
+<pre><code>perror("malloc");
+exit(1);
 </code></pre>
 
-<p>list_add(&amp;my_struct2.lists, &amp;my_struct_list);
+<p>  }</p>
+
+<p>  printf(&ldquo;main: shared %p %p\n&rdquo;,</p>
+
+<pre><code>     &amp;shared.num_proc1, &amp;shared.num_proc2);
+</code></pre>
+
+<p>  /<em> clone a thread sharing memory space with the parent process </em>/
+  if ((pid = clone(child, stack + STACK_SIZE, CLONE_VM, NULL)) &lt; 0) {</p>
+
+<pre><code>perror("clone");
+exit(1);
+</code></pre>
+
+<p>  }</p>
+
+<p>  for (i = 0; i &lt; loop_i; i++) {</p>
+
+<pre><code>for(j = 0; j &lt; loop_j; j++) {
+  shared.num_proc1++;
+}
+</code></pre>
+
+<p>  }
+}</p>
+
+<p>int child(void *arg)
+{
+  int i, j;</p>
+
+<p>  printf(&ldquo;child: shared %p %p\n&rdquo;,</p>
+
+<pre><code>     &amp;shared.num_proc1, &amp;shared.num_proc2);
+</code></pre>
+
+<p>  for (i = 0; i &lt; loop_i; i++) {</p>
+
+<pre><code>for (j = 0; j &lt; loop_j; j++) {
+  shared.num_proc2++;
+}
+</code></pre>
+
+<p>  }
+}
 ```</p>
 
-<p>插入my_struct2之后，我们看到的链表结构如下图所示：</p>
+<p>``` c alignment</p>
 
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/list-head-one.png"></p>
+<h1>define _GNU_SOURCE</h1>
 
-<h5>再插入一个链表项</h5>
+<h1>include &lt;sched.h></h1>
 
-<p>``` c 插入my_struct1到链表
-my_struct_t my_struct1 = {.id = 1,</p>
+<h1>include &lt;stdio.h></h1>
 
-<pre><code>                      .name = "struct1"};
+<h1>include &lt;errno.h></h1>
+
+<h1>include &lt;stdlib.h></h1>
+
+<p>// cache line size
+// hardware dependent value
+// it can checks from /proc/cpuinfo</p>
+
+<h1>define CACHE_LINE_SIZE 64</h1>
+
+<p>// shared data aligned with cache line size
+struct shared_data {
+  unsigned int <strong>attribute</strong> ((aligned (CACHE_LINE_SIZE))) num_proc1;
+  unsigned int <strong>attribute</strong> ((aligned (CACHE_LINE_SIZE))) num_proc2;
+};</p>
+
+<p>struct shared_data shared;</p>
+
+<p>// define loops to run for a while
+int loop_i = 100000, loop_j = 100000;</p>
+
+<p>int child(void *);</p>
+
+<h1>define STACK_SIZE (8 * 1024)</h1>
+
+<p>int main(void)
+{
+  pid_t pid;
+  int i, j;</p>
+
+<p>  /<em> Stack </em>/
+  char <em>stack = (char </em>)malloc(STACK_SIZE);
+  if (!stack) {</p>
+
+<pre><code>perror("malloc");
+exit(1);
 </code></pre>
 
-<p>list_add(&amp;my_struct1.lists, &amp;my_struct_list);
-```</p>
+<p>  }</p>
 
-<p>插入my_struct1之后，我们看到的链表结构如下图所示：</p>
+<p>  printf(&ldquo;main: shared %p %p\n&rdquo;,</p>
 
-<p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/list-head-two.png"></p>
-
-<h5>从链表项指针得到原数据结构的指针</h5>
-
-<p>从链表项指针到原数据结构的指针是双向链表使用便利的关键，如果我们得到了一个链表项，可以通过list_entry(ptr, type, member)来得到指向struct list_head嵌入的数据结构的指针。其中ptr是一个指向struct list_head的指针，type是struct list_head嵌入的数据结构，memeber是struct list_head嵌入的字段名。看一个例子会容易明白：</p>
-
-<p><code>c 得到指向原数据结构的指针
-my_struct_t *my_structp = list_entry(my_struct_list.next, my_struct_t, lists);
-</code></p>
-
-<p>my_structp会指向上述链表结构中my_struct1，和下述赋值语句等效</p>
-
-<p><code>c
-my_structp = &amp;my_struct1;
-</code></p>
-
-<p>大家可能对list_entry如何实现比较好奇，下面是简化的源代码，使用了c中一个常见的技巧：</p>
-
-<p>``` c list_entry的实现</p>
-
-<h1>define list_entry(ptr, type, member) \</h1>
-
-<pre><code>      (type *) ((char *) ptr - offset(type, memeber);
+<pre><code>     &amp;shared.num_proc1, &amp;shared.num_proc2);
 </code></pre>
 
-<h1>define offsetof(TYPE, MEMBER) ((size_t) &amp;((TYPE *)0)&ndash;>MEMBER)</h1>
+<p>  /<em> clone a thread sharing memory space with the parent process </em>/
+  if ((pid = clone(child, stack + STACK_SIZE, CLONE_VM, NULL)) &lt; 0) {</p>
+
+<pre><code>perror("clone");
+exit(1);
+</code></pre>
+
+<p>  }</p>
+
+<p>  for (i = 0; i &lt; loop_i; i++) {</p>
+
+<pre><code>for(j = 0; j &lt; loop_j; j++) {
+  shared.num_proc1++;
+}
+</code></pre>
+
+<p>  }
+}</p>
+
+<p>int child(void *arg)
+{
+  int i, j;</p>
+
+<p>  printf(&ldquo;child: shared %p %p\n&rdquo;,</p>
+
+<pre><code>     &amp;shared.num_proc1, &amp;shared.num_proc2);
+</code></pre>
+
+<p>  for (i = 0; i &lt; loop_i; i++) {</p>
+
+<pre><code>for (j = 0; j &lt; loop_j; j++) {
+  shared.num_proc2++;
+}
+</code></pre>
+
+<p>  }
+}</p>
 
 <p>```</p>
 
-<p>offsetof计算字段MEMBER在类型TYPE中的偏移，这个偏移在编译的时候就由编译器计算得到。list_entry将链表项的指针减去list_head字段的偏移就得到了原数据结构的指针。</p>
+<h3>Testing</h3>
 
-<h5>遍历整个链表list_for_each和list_for_each_entry</h5>
+<p>I was using the Oprofile 0.99 which has &lsquo;operf&rsquo; program that allows non-root users to profile a specified individual process with less setup. Different CPUs have different supported events. The supported events, their meanings and accepted event format by operf can be checked from ophelp and the CPU&rsquo;s hardware manual. In this experiment, the CLOCK event is CPU_CLK_UNHALTED and L2_LINES_IN is the number of allocated lines in L2 which is L2 cache missing number. As examples, the &ldquo;CPU_CLK_UNHALTED:100000&rdquo; tells operf to sample every 100000 unhalted clock with default mask(unhalted core cycles). The &ldquo;L2_LINES_IN:100000:0xf0&rdquo; tells operf to sample every 1000000 number of allocated lines in L2 on all cores with all prefetch inclusive.</p>
 
-<p>使用list_for_each(pos, head)可以遍历整个链表的链表项，head是链表头，pos是指向当前链表项的指针，每次循环时，pos都会更新为下一个链表项，下面例子打印列表中的id和name：</p>
+<p>The following is the experiment results.</p>
 
-<p>``` c 遍历一
-struct list_head <em>pos;
-my_struct_t </em>my_structp;</p>
+<p>``` bash profiling result of alignment
+$time operf &mdash;event=CPU_CLK_UNHALTED:100000,L2_LINES_IN:100000:0xf0 ./alignment</p>
 
-<p>list_for_each(pos, &amp;my_struct_list) {
-  my_structp = list_entry(pos, my_struct_t, lists);
-  printf(&ldquo;id=%d, name=%s\n&rdquo;, my_structp->id, my_structp->name);
-}
-```</p>
+<p>operf: Profiler started
+main: shared 0x6010c0 0x601100
+child: shared 0x6010c0 0x601100</p>
 
-<p>输出</p>
+<p>profiled app exited with the following status: 160</p>
 
-<blockquote><p>id=1, name=struct1
-id=2, name=struct2</p></blockquote>
+<p>Profiling done.</p>
 
-<p>list_for_each_entry(pos, head, member)可以遍历整个链表的原数据结构，head是链表头，pos为指向当前链表项所嵌入的原数据结构的指针，member是被嵌入数据结构struct list_head申明的字段名。实际上是list_for_each和list_entry的组合，所以上段代码也可以写成下面的方式，看起来更加简洁：</p>
+<p>real    0m41.373s
+user    0m54.015s
+sys     0m0.728s</p>
 
-<p>``` c 遍历二
-my_struct_t *my_structp;</p>
+<p>$opreport
+Using /home/work/oprof_cache/oprofile_data/samples/ for samples directory.
+CPU: Core 2, speed 2.401e+06 MHz (estimated)
+Counted CPU_CLK_UNHALTED events (Clock cycles when not halted) with a unit mask of 0x00 (Unhalted core cycles) count 100000
+Counted L2_LINES_IN events (number of allocated lines in L2) with a unit mask of 0xf0 (multiple flags) count 100000
+CPU_CLK_UNHALT&hellip;|L2_LINES_IN:10&hellip;|</p>
 
-<p>list_for_each_entry(my_structp, &amp;my_struct_list, lists) {
-  printf(&ldquo;id=%d, name=%s\n&rdquo;, my_structp->id, my_structp-name);
-}
-```</p>
+<h2>  samples|      %|  samples|      %|</h2>
 
-<h4>总结</h4>
+<p>   939093 100.000    396933 100.000 alignment</p>
 
-<ol>
-<li>使用双向链表需要在自己的数据结构中申明一个struct list_head的字段，定义的数据结构通过这个字段链接起来</li>
-<li>使用LIST_HEAD宏申明一个链表头，这个链表头指向双向链表</li>
-<li>使用&lt;linux/list.h>提供的add，delete等操作函数管理链表</li>
-<li>通过list_entry及其他_entry结尾的函数得到原数据结构的指针，list_entry的实现采用了一个小技巧，是链表方便易用的原因</li>
-</ol>
+<pre><code>    CPU_CLK_UNHALT...|L2_LINES_IN:10...|
+      samples|      %|  samples|      %|
+    ------------------------------------
+       936430 99.7164    395920 99.7448 alignment
+         2657  0.2829      1013  0.2552 no-vmlinux
+            5 5.3e-04         0       0 ld-2.15.so
+            1 1.1e-04         0       0 libc-2.15.so
+</code></pre>
 
+<p>```</p>
+
+<p>``` bash profiling result of no_alignment
+$time operf &mdash;event=CPU_CLK_UNHALTED:100000,L2_LINES_IN:100000:0xf0 ./no_alignment
+operf: Profiler started
+main: shared 0x601058 0x60105c
+child: shared 0x601058 0x60105c
+profiled app exited with the following status: 160</p>
+
+<p>Profiling done.</p>
+
+<p>real    1m24.739s
+user    1m59.167s
+sys     0m1.344s</p>
+
+<p>$opreport
+Using /home/work/oprof_cache/oprofile_data/samples/ for samples directory.
+CPU: Core 2, speed 2.401e+06 MHz (estimated)
+Counted CPU_CLK_UNHALTED events (Clock cycles when not halted) with a unit mask of 0x00 (Unhalted core cycles) count 100000
+Counted L2_LINES_IN events (number of allocated lines in L2) with a unit mask of 0xf0 (multiple flags) count 100000
+CPU_CLK_UNHALT&hellip;|L2_LINES_IN:10&hellip;|</p>
+
+<h2>  samples|      %|  samples|      %|</h2>
+
+<p>  1423030 100.000   1177262 100.000 no_alignment</p>
+
+<pre><code>    CPU_CLK_UNHALT...|L2_LINES_IN:10...|
+      samples|      %|  samples|      %|
+    ------------------------------------
+      1419249 99.7343   1174038 99.7261 no_alignment
+         3778  0.2655      3224  0.2739 no-vmlinux
+            2 1.4e-04         0       0 ld-2.15.so
+            1 7.0e-05         0       0 libc-2.15.so
+</code></pre>
+
+<p>```</p>
+
+<h3>Analysis and Conclusion</h3>
+
+<p>I drawed the table for the analysising.</p>
+
+<p><img src="media/Oprofile-and-Cache/Oprofile-and-Cache.png"></p>
+
+<p>Here is the conclusion:</p>
+
+<ul>
+<li>The cache missing rate of no_alignment was 82.73%. It became 42.27% with alignment optimization. The cache missing rate was reduced to almost half.</li>
+<li>The no_alignment ran 120.5 seconds and the alignment ran 55 seconds. It was a bit more than double faster with alignment optimization.</li>
+</ul>
+
+
+<blockquote><p><strong>NOTE:</strong> The real time is less than user + sys because the program runs on mutlecores parallel</p></blockquote>
 ]]></content>
   </entry>
   

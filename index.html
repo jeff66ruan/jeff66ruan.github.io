@@ -9,7 +9,7 @@
   <meta name="author" content="Jeff Ruan">
 
   
-  <meta name="description" content="Last week, I did a small experiment of using oprofile to profile two piece of code. In this small experiment, I learned some basic ideas of using &hellip;">
+  <meta name="description" content="The following is the field definition from Linux man proc(5). SigPnd, ShdPnd: Number of signals pending for thread and for process as a whole (see &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +78,66 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file/">SigPnd, ShdPnd, SigBlk, SigIgn and SigCgt Fields in Proc Information File System</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-03-31T20:59:51+08:00" pubdate data-updated="true">Mar 31<span>st</span>, 2014</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>The following is the field definition from Linux man proc(5).</p>
+
+<blockquote><p>SigPnd, ShdPnd: Number of signals pending for thread and for process as a whole (see pthreads(7) and signal(7)).</p>
+
+<p>SigBlk, SigIgn, SigCgt: Masks indicating signals being blocked, ignored, and caught (see signal(7)).</p></blockquote>
+
+<p>But what they look like and how to interpret? Here is an output example:</p>
+
+<blockquote><p>SigPnd: 0000000000000000
+ShdPnd: 0000000000000000
+SigBlk: fffffffe7ffbfeff
+SigIgn: 0000000000000000
+SigCgt: 0000000000000000</p></blockquote>
+
+<p>They are displayed in hex format as 8 bytes. The right most 4 bytes represent stardard signals, the left is Linux real-time signal extension. Each bit in the 8 bytes represents one corresponding signal. If the bits index starts from zero(the right most bit in the above), The corresponding signal is represented by bit[signalValue-1]. An example is that the signal SIGHUP, whose value is 1, is represented the bit 0.</p>
+
+<p>Take the above SigBlk as example, the first two bytes are</p>
+
+<blockquote><p>0xfeff</p></blockquote>
+
+<p>The binary format is</p>
+
+<blockquote><p>1111,1110,1111,1111</p></blockquote>
+
+<p>It means all signals from 1 to 16 are blocked except the signal 9 (SIGKILL). This is true because SIGKILL cannot be blocked or ignored.</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1631,6 +1691,10 @@ id=2, name=struct2</p></blockquote>
     <section>
   <h1>Recent Posts</h1>
   <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file/">SigPnd, ShdPnd, SigBlk, SigIgn and SigCgt Fields in Proc Information File System</a>
+      </li>
     
       <li class="post">
         <a href="/blog/2014/03/24/oprofile-and-cache-an-experiment/">Oprofile and Memory Cache - an Experiment</a>
