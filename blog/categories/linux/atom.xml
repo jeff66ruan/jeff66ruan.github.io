@@ -4,7 +4,7 @@
   <title><![CDATA[Category: Linux | For Fun and Logging]]></title>
   <link href="http://jeff66ruan.github.io/blog/categories/linux/atom.xml" rel="self"/>
   <link href="http://jeff66ruan.github.io/"/>
-  <updated>2014-04-01T09:55:41+08:00</updated>
+  <updated>2014-06-28T01:50:54-07:00</updated>
   <id>http://jeff66ruan.github.io/</id>
   <author>
     <name><![CDATA[Jeff Ruan]]></name>
@@ -14,9 +14,9 @@
 
   
   <entry>
-    <title type="html"><![CDATA[SigPnd, ShdPnd, SigBlk, SigIgn and SigCgt Fields in Proc Information File System]]></title>
+    <title type="html"><![CDATA[SigPnd, ShdPnd, SigBlk, SigIgn and SigCgt fields in proc information file system]]></title>
     <link href="http://jeff66ruan.github.io/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file/"/>
-    <updated>2014-03-31T20:59:51+08:00</updated>
+    <updated>2014-03-31T05:59:51-07:00</updated>
     <id>http://jeff66ruan.github.io/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file</id>
     <content type="html"><![CDATA[<p>The following is the field definition from Linux man proc(5).</p>
 
@@ -47,10 +47,10 @@ SigCgt: 0000000000000000</p></blockquote>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[Oprofile and Memory Cache - an Experiment]]></title>
-    <link href="http://jeff66ruan.github.io/blog/2014/03/24/oprofile-and-cache-an-experiment/"/>
-    <updated>2014-03-24T11:03:38+08:00</updated>
-    <id>http://jeff66ruan.github.io/blog/2014/03/24/oprofile-and-cache-an-experiment</id>
+    <title type="html"><![CDATA[Oprofile and Memory cache - an experiment]]></title>
+    <link href="http://jeff66ruan.github.io/blog/2014/03/23/oprofile-and-cache-an-experiment/"/>
+    <updated>2014-03-23T20:03:38-07:00</updated>
+    <id>http://jeff66ruan.github.io/blog/2014/03/23/oprofile-and-cache-an-experiment</id>
     <content type="html"><![CDATA[<p>Last week, I did a small experiment of using oprofile to profile two piece of code. In this small experiment, I learned some basic ideas of using oprofile. In particular, I used oprofile to profile memory cache behaviour and the performance effect. In this experiment, I got ideas of how memory cache invalidation can affect the speed of running program. The following is the detail.</p>
 
 <h3>The Experiment Configuration</h3>
@@ -353,9 +353,9 @@ CPU_CLK_UNHALT&hellip;|L2_LINES_IN:10&hellip;|</p>
   
   <entry>
     <title type="html"><![CDATA[双向链表在Linux Kernel中的实现]]></title>
-    <link href="http://jeff66ruan.github.io/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/"/>
-    <updated>2014-02-27T05:41:58+08:00</updated>
-    <id>http://jeff66ruan.github.io/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel</id>
+    <link href="http://jeff66ruan.github.io/blog/2014/02/26/doubly-linked-list-in-the-linux-kernel/"/>
+    <updated>2014-02-26T13:41:58-08:00</updated>
+    <id>http://jeff66ruan.github.io/blog/2014/02/26/doubly-linked-list-in-the-linux-kernel</id>
     <content type="html"><![CDATA[<p>双向链表是一个简单的数据结构,使用非常广泛，应该人人知道，会用，打开编辑器马上可以写一个。但是Linux的双向链表实现非常巧妙，它使用了一个小小的编程技巧，使得开发人员定义自己的数据结构时添加一个struct list_head字段（list_head是Linux Kernel定义的双向链表的数据结构），就可以使自己的数据结构具备双向链表功能，采用Linux Kernel提供的操作函数，使得使用双向链表非常简单。如果我们在v3.9-rc8中grep list_head，竟然有多达11400多条匹配，可见双向链表在Linux kernel中的江湖地位，实际上，我们在读Linux源码时，到处可以见到以list_head组织起来的数据结构。</p>
 
 <p><img src="media/Doubly-Linked-List-in-the-Linux-Kernel/lines-of-list-head.png"></p>

@@ -2,34 +2,34 @@
 <urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>
     <url>
         <loc>
-            http://jeff66ruan.github.io/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/
+            http://jeff66ruan.github.io/blog/2014/02/26/doubly-linked-list-in-the-linux-kernel/
         </loc>
-        <lastmod>2014-03-15T13:26:47+08:00</lastmod>
+        <lastmod>2014-06-28T01:50:30-07:00</lastmod>
     </url>
     <url>
-        <loc>http://jeff66ruan.github.io/blog/2014/03/10/a-piece-of-code-refactoring/</loc>
-        <lastmod>2014-03-15T13:25:55+08:00</lastmod>
+        <loc>http://jeff66ruan.github.io/blog/2014/03/09/a-piece-of-code-refactoring/</loc>
+        <lastmod>2014-06-28T01:50:30-07:00</lastmod>
     </url>
     <url>
-        <loc>http://jeff66ruan.github.io/blog/2014/03/24/oprofile-and-cache-an-experiment/</loc>
-        <lastmod>2014-03-24T15:12:23+08:00</lastmod>
+        <loc>http://jeff66ruan.github.io/blog/2014/03/23/oprofile-and-cache-an-experiment/</loc>
+        <lastmod>2014-06-28T01:50:30-07:00</lastmod>
     </url>
     <url>
         <loc>
             http://jeff66ruan.github.io/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file/
         </loc>
-        <lastmod>2014-03-31T21:42:16+08:00</lastmod>
-    </url>
-    <url>
-        <loc>http://jeff66ruan.github.io/blog/archives/</loc>
-        <lastmod>2014-03-31T21:42:16+08:00</lastmod>
+        <lastmod>2014-06-28T01:50:30-07:00</lastmod>
     </url>
     <url>
         <loc>http://jeff66ruan.github.io/robots.txt</loc>
-        <lastmod>2014-02-27T06:16:10+08:00</lastmod>
+        <lastmod>2014-02-26T14:16:10-08:00</lastmod>
+    </url>
+    <url>
+        <loc>http://jeff66ruan.github.io/blog/archives/</loc>
+        <lastmod>2014-06-28T01:50:30-07:00</lastmod>
     </url>
     <url>
         <loc>http://jeff66ruan.github.io/</loc>
-        <lastmod>2014-03-31T21:42:16+08:00</lastmod>
+        <lastmod>2014-06-28T01:50:30-07:00</lastmod>
     </url>
 </urlset>

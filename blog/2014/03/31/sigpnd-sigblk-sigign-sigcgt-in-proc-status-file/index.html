@@ -5,7 +5,7 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>SigPnd, ShdPnd, SigBlk, SigIgn and SigCgt Fields in Proc Information File System - For Fun and Logging</title>
+  <title>SigPnd, ShdPnd, SigBlk, SigIgn and SigCgt fields in proc information file system - For Fun and Logging</title>
   <meta name="author" content="Jeff Ruan">
 
   
@@ -20,21 +20,36 @@
   
   <link rel="canonical" href="http://jeff66ruan.github.io/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file">
   <link href="/favicon.png" rel="icon">
-  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
-  <link href="/atom.xml" rel="alternate" title="For Fun and Logging" type="application/atom+xml">
-  <script src="/javascripts/modernizr-2.0.js"></script>
-  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <link href="/stylesheets/bootstrap/bootstrap.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/bootstrap/responsive.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/syntax/syntax.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <style type="text/css">
+    body {
+      padding-bottom: 40px;
+    }
+    h1 {
+      margin-bottom: 15px;
+    }
+    img {
+      max-width: 100%;
+    }
+    .sharing, .meta, .pager {
+      margin: 20px 0px 20px 0px;
+    }
+    .page-footer p {
+      text-align: center;
+    }
+  </style>
+  <script src="/javascripts/libs/jquery.js"></script>
+  <script src="/javascripts/libs/modernizr-2.0.js"></script>
+  <script src="/javascripts/libs/bootstrap.js"></script>
   <script src="/javascripts/octopress.js" type="text/javascript"></script>
-  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
-<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-
+  <link href="/atom.xml" rel="alternate" title="For Fun and Logging" type="application/atom+xml">
+  
   
   <script type="text/javascript">
     var _gaq = _gaq || [];
     _gaq.push(['_setAccount', 'UA-48990941-1']);
-    _gaq.push(['_setDomainName', 'github.io']);
     _gaq.push(['_trackPageview']);
 
     (function() {
@@ -48,38 +63,49 @@
 </head>
 
 <body   >
-  <header role="banner"><hgroup>
-  <h1><a href="/">For Fun and Logging</a></h1>
-  
-    <h2>Linux & Code</h2>
-  
-</hgroup>
+  <nav role="navigation"><div class="navbar navbar-inverse">
+  <div class="navbar-inner">
+    <div class="container">
+      <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </a>
 
-</header>
-  <nav role="navigation"><ul class="subscription" data-subscription="rss">
-  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
-  
-</ul>
-  
-<form action="http://google.com/search" method="get">
-  <fieldset role="search">
-    <input type="hidden" name="q" value="site:jeff66ruan.github.io" />
-    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
-  </fieldset>
-</form>
-  
-<ul class="main-navigation">
+      <a class="brand" href="/">For Fun and Logging</a>
+
+      <div class="nav-collapse">
+        <ul class="nav">
   <li><a href="/">Blog</a></li>
   <li><a href="/blog/archives">Archives</a></li>
 </ul>
 
+
+        <ul class="nav pull-right" data-subscription="rss">
+          <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+          
+        </ul>
+
+        
+          <form class="pull-right navbar-search" action="http://google.com/search" method="get">
+            <fieldset role="search">
+              <input type="hidden" name="q" value="site:jeff66ruan.github.io" />
+              <input class="search-query" type="text" name="q" results="0" placeholder="Search"/>
+            </fieldset>
+          </form>
+        
+      </div>
+    </div>
+  </div>
+</div>
 </nav>
-  <div id="main">
-    <div id="content">
-      <div>
-<article class="hentry" role="article">
+  <div class="container">
+    <div class="row-fluid">
+      
+<article class="hentry span9" role="article">
+
   
-  <header>
+  <header class="page-header">
     
       <h1 class="entry-title">SigPnd, ShdPnd, SigBlk, SigIgn and SigCgt Fields in Proc Information File System</h1>
     
@@ -97,7 +123,7 @@
   
 
 
-<time datetime="2014-03-31T20:59:51+08:00" pubdate data-updated="true">Mar 31<span>st</span>, 2014</time>
+<time datetime="2014-03-31T05:59:51-07:00" pubdate data-updated="true">Mar 31<span>st</span>, 2014</time>
         
       </p>
     
@@ -151,7 +177,7 @@ SigCgt: 0000000000000000</p></blockquote>
   
 
 
-<time datetime="2014-03-31T20:59:51+08:00" pubdate data-updated="true">Mar 31<span>st</span>, 2014</time>
+<time datetime="2014-03-31T05:59:51-07:00" pubdate data-updated="true">Mar 31<span>st</span>, 2014</time>
       
 
 <span class="categories">
@@ -165,44 +191,46 @@ SigCgt: 0000000000000000</p></blockquote>
     
       <div class="sharing">
   
-  <a href="//twitter.com/share" class="twitter-share-button" data-url="http://jeff66ruan.github.io/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file/" data-via="" data-counturl="http://jeff66ruan.github.io/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file/" >Tweet</a>
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://jeff66ruan.github.io/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file/" data-via="" data-counturl="http://jeff66ruan.github.io/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file/" >Tweet</a>
   
   
   
 </div>
 
     
-    <p class="meta">
+    
+    <ul class="pager">
       
-        <a class="basic-alignment left" href="/blog/2014/03/24/oprofile-and-cache-an-experiment/" title="Previous Post: Oprofile and Memory cache - an experiment">&laquo; Oprofile and Memory cache - an experiment</a>
+      <li class="previous"><a class="basic-alignment left"
+        href="/blog/2014/03/23/oprofile-and-cache-an-experiment/" title="Previous Post:
+        Oprofile and Memory cache - an experiment">&laquo; Oprofile and Memory cache - an experiment</a></li>
       
+      <li><a href="/blog/archives">Blog Archives</a></li>
       
-    </p>
+    </ul>
   </footer>
 </article>
 
-</div>
-
-<aside class="sidebar">
+<aside class="sidebar-nav span3">
   
-    <section>
-  <h1>Recent Posts</h1>
-  <ul id="recent_posts">
+    <section class="well">
+  <ul id="recent_posts" class="nav nav-list">
+    <li class="nav-header">Recent Posts</li>
     
       <li class="post">
-        <a href="/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file/">SigPnd, ShdPnd, SigBlk, SigIgn and SigCgt Fields in Proc Information File System</a>
+        <a href="/blog/2014/03/31/sigpnd-sigblk-sigign-sigcgt-in-proc-status-file/">SigPnd, ShdPnd, SigBlk, SigIgn and SigCgt fields in proc information file system</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/03/24/oprofile-and-cache-an-experiment/">Oprofile and Memory Cache - an Experiment</a>
+        <a href="/blog/2014/03/23/oprofile-and-cache-an-experiment/">Oprofile and Memory cache - an experiment</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/03/10/a-piece-of-code-refactoring/">一段代码的重构</a>
+        <a href="/blog/2014/03/09/a-piece-of-code-refactoring/">一段代码的重构</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/02/27/doubly-linked-list-in-the-linux-kernel/">双向链表在Linux Kernel中的实现</a>
+        <a href="/blog/2014/02/26/doubly-linked-list-in-the-linux-kernel/">双向链表在Linux Kernel中的实现</a>
       </li>
     
   </ul>
@@ -218,7 +246,8 @@ SigCgt: 0000000000000000</p></blockquote>
 
     </div>
   </div>
-  <footer role="contentinfo"><p>
+  <footer role="contentinfo" class="page-footer"><hr>
+<p>
   Copyright &copy; 2014 - Jeff Ruan -
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
@@ -237,7 +266,7 @@ SigCgt: 0000000000000000</p></blockquote>
       var twitterWidgets = document.createElement('script');
       twitterWidgets.type = 'text/javascript';
       twitterWidgets.async = true;
-      twitterWidgets.src = '//platform.twitter.com/widgets.js';
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
       document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
     })();
   </script>

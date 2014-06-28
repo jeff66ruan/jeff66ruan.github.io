@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 
-  <title><![CDATA[Category: Code, | For Fun and Logging]]></title>
+  <title><![CDATA[Category: code, | For Fun and Logging]]></title>
   <link href="http://jeff66ruan.github.io/blog/categories/code/atom.xml" rel="self"/>
   <link href="http://jeff66ruan.github.io/"/>
-  <updated>2014-04-01T09:55:41+08:00</updated>
+  <updated>2014-06-28T01:50:54-07:00</updated>
   <id>http://jeff66ruan.github.io/</id>
   <author>
     <name><![CDATA[Jeff Ruan]]></name>
@@ -14,10 +14,10 @@
 
   
   <entry>
-    <title type="html"><![CDATA[Oprofile and Memory Cache - an Experiment]]></title>
-    <link href="http://jeff66ruan.github.io/blog/2014/03/24/oprofile-and-cache-an-experiment/"/>
-    <updated>2014-03-24T11:03:38+08:00</updated>
-    <id>http://jeff66ruan.github.io/blog/2014/03/24/oprofile-and-cache-an-experiment</id>
+    <title type="html"><![CDATA[Oprofile and Memory cache - an experiment]]></title>
+    <link href="http://jeff66ruan.github.io/blog/2014/03/23/oprofile-and-cache-an-experiment/"/>
+    <updated>2014-03-23T20:03:38-07:00</updated>
+    <id>http://jeff66ruan.github.io/blog/2014/03/23/oprofile-and-cache-an-experiment</id>
     <content type="html"><![CDATA[<p>Last week, I did a small experiment of using oprofile to profile two piece of code. In this small experiment, I learned some basic ideas of using oprofile. In particular, I used oprofile to profile memory cache behaviour and the performance effect. In this experiment, I got ideas of how memory cache invalidation can affect the speed of running program. The following is the detail.</p>
 
 <h3>The Experiment Configuration</h3>
